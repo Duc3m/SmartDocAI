@@ -1,5 +1,3 @@
-from multiprocessing import context
-
 import streamlit as st
 import os
 import time
@@ -118,13 +116,11 @@ def main_chat_view(embedding_model, llm):
 
         with st.chat_message("assistant"):
             with st.spinner("Đang suy nghĩ..."):
-                    raw_response = answer_query(prompt, st.session_state.retriever, llm)
-                    # Chuyển đổi định dạng LaTeX trước khi in
-                    full_response = format_latex_for_streamlit(raw_response)
-                        
-                    st.markdown(full_response) # Streamlit sẽ tự render LaTeX bên trong markdown
-                    with st.expander("📚 Xem context"):
-                        st.write(context)
+                # Gọi hàm và đợi lấy toàn bộ kết quả
+                full_response = answer_query(prompt, st.session_state.retriever, llm)
+                    
+                # In kết quả ra màn hình một lần duy nhất
+                st.markdown(full_response)
                 
         # Lưu vào DB và Session State
         insert_message(file_id, "assistant", full_response)
