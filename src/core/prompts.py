@@ -27,6 +27,12 @@ def get_prompt_template(user_input: str) -> PromptTemplate:
             1. NGÔN NGỮ: BẠN PHẢI LUÔN LUÔN TRẢ LỜI BẰNG TIẾNG VIỆT (VIETNAMESE). TUYỆT ĐỐI KHÔNG ĐƯỢC SỬ DỤNG TIẾNG TRUNG HOẶC BẤT KỲ NGÔN NGỮ NÀO KHÁC.
             2. SỰ THẬT: Chỉ sử dụng thông tin xuất hiện trong phần Context. Nếu phần Context không chứa câu trả lời cho câu hỏi, bạn PHẢI trả lời chính xác là: "Xin lỗi, tài liệu không đề cập đến thông tin này."
             3. KHÔNG BỊA ĐẶT: Tuyệt đối không được tự suy diễn, không được dùng kiến thức bên ngoài Context để trả lời.
+
+            🚨 QUY TẮC ĐỊNH DẠNG TOÁN HỌC:
+            - Nếu có công thức toán học, bạn PHẢI sử dụng LaTeX.
+            - Sử dụng cặp dấu $$ cho công thức hiển thị riêng biệt (ví dụ: $$E=mc^2$$).
+            - Sử dụng cặp dấu $ cho công thức nằm trong dòng văn bản (ví dụ: $x=2$).
+            - TUYỆT ĐỐI KHÔNG dùng các ký hiệu như \[ \] hoặc \( \).
         """
     else:
         # Prompt cho tiếng Anh và ngôn ngữ khác [cite: 250-258]

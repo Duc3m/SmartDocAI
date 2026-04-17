@@ -116,11 +116,12 @@ def main_chat_view(embedding_model, llm):
 
         with st.chat_message("assistant"):
             with st.spinner("Đang suy nghĩ..."):
-                # Gọi hàm và đợi lấy toàn bộ kết quả
-                full_response = answer_query(prompt, st.session_state.retriever, llm)
+                raw_response = answer_query(prompt, st.session_state.retriever, llm)
                     
-                # In kết quả ra màn hình một lần duy nhất
-                st.markdown(full_response)
+                # Chuyển đổi định dạng LaTeX trước khi in
+                full_response = format_latex_for_streamlit(raw_response)
+                    
+                st.markdown(full_response) # Streamlit sẽ tự render LaTeX bên trong markdown
                 
         # Lưu vào DB và Session State
         insert_message(file_id, "assistant", full_response)
@@ -128,3 +129,13 @@ def main_chat_view(embedding_model, llm):
             
         # Rerun để đồng bộ UI
         st.rerun()
+
+def format_latex_for_streamlit(text):
+    """
+    Chuyển đổi các ký hiệu LaTeX lạ về chuẩn $ và $$ của Streamlit
+    """
+    # Thay thế \[ ... \] thành $$ ... $$
+    text = text.replace(r"\[", "$$").replace(r"\]", "$$")
+    # Thay thế \( ... \) thành $ ... $
+    text = text.replace(r"\(", "$").replace(r"\)", "$")
+    return text
