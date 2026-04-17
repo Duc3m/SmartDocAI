@@ -1,6 +1,9 @@
 from core.prompts import get_prompt_template
 from langchain_core.runnables import RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
+from langchain.globals import set_debug
+
+set_debug(True)
 
 def format_docs(docs):
     """
