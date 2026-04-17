@@ -1,0 +1,17 @@
+# Python cache (Quét sạch toàn bộ __pycache__ ở mọi cấp độ thư mục)
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Môi trường ảo
+venv/
+.env
+
+# Database (SQLite, v.v.)
+*.db
+data/*
+vector_db/*
+
+# Cấu hình IDE (Nếu bạn dùng VS Code hoặc PyCharm)
+.vscode/
+.idea/
