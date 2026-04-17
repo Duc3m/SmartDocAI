@@ -37,8 +37,8 @@ def answer_query(user_input: str, retriever, llm):
     try:
         # Tạo chain cho ngữ cảnh hiện tại
         chain = create_rag_chain(retriever, llm, user_input)
-        with open('context.txt', 'a', encoding='utf-8') as file:
-            file.write(chain + "\n\n=*50")
+        # with open('context.txt', 'a', encoding='utf-8') as file:
+        #     file.write(chain + "\n\n=*50")
         # Dùng .invoke() để lấy toàn bộ câu trả lời
         response = chain.invoke(user_input)
         
