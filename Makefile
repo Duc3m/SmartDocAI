@@ -23,12 +23,16 @@ setup:
 
 # 2. Tải mô hình AI (yêu cầu máy đã cài Ollama)
 pull-model:
+	ollama serve
 	ollama pull qwen2.5:7b
 	@echo "=> Đã tải xong model Qwen2.5:7b!"
 
 run-model:
 	ollama serve
 	ollama run qwen2.5:7b
+
+stop-model:
+	ollama stop qwen2.5:7b
 
 # 3. Khởi chạy ứng dụng
 run:
