@@ -50,10 +50,25 @@ git clone https://github.com/Duc3m/SmartDocAI.git
 cd SmartDocAI
 ```
 
+#### Tạo và khởi động môi trường ảo
+
+```bash
+python3 -m venv venv
+source venv/bin/activate
+```
+
 #### Cài đặt thư viện:
 
 ```bash
 make setup
+```
+
+#### Chạy các lệnh sau ở một cửa sổ terminal riêng:
+
+```bash
+sudo apt install zstd
+curl -fsSL https://ollama.com/install.sh | sh
+ollama serve
 ```
 
 #### Tải Model từ Ollama:
