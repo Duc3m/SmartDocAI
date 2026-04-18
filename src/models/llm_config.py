@@ -1,5 +1,5 @@
+import os
 import streamlit as st
-import dotenv
 from langchain_community.chat_models import ChatOllama
 
 @st.cache_resource
@@ -7,9 +7,8 @@ def get_llm():
     """
     Khởi tạo và cấu hình mô hình Qwen2.5:7b thông qua Ollama[cite: 102, 222].
     """
-    dotenv.load_dotenv()
-    model_name = dotenv.get("MODEL_NAME", "qwen2.5:7b")
-    base_url = dotenv.get("OLLAMA_BASE_URL", "http://localhost:11434")
+    model_name = os.getenv("LLM_MODEL", "qwen2.5:7b")
+    base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
     try:
         llm = ChatOllama(
             model=model_name,              # Mô hình Qwen thế hệ mới tối ưu cho tiếng Việt [cite: 93, 224]

@@ -1,6 +1,5 @@
 from langchain_community.document_loaders import PDFPlumberLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-import os
 
 def load_and_split_pdf(file_path):
     """
