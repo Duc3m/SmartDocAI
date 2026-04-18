@@ -104,7 +104,7 @@ make run
 Dự án này được tối ưu để có thể tận dụng sức mạnh GPU (T4 16GB VRAM) miễn phí của Google Colab.
 
 1. Chọn Runtime -> Change runtime type -> T4 GPU.
-2. Chạy đoạn mã khởi tạo sau một lần duy nhất trong Colab Notebook:
+2. Chạy đoạn mã khởi tạo sau một lần duy nhất trong Colab Notebook (khi có thông báo restart session, chọn restart session):
 
 ```python
 !git clone https://github.com/Duc3m/SmartDocAI
@@ -140,6 +140,7 @@ if not is_port_in_use(11434):
     with open(os.devnull, 'w') as fnull:
         subprocess.Popen(['ollama', 'serve'], stdout=fnull, stderr=fnull)
     time.sleep(10)
+    subprocess.run(['ollama', 'run', 'qwen2.5:7b', 'hi'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 else:
     print("✅ Ollama đã chạy sẵn rồi, bỏ qua bước khởi động!")
 
