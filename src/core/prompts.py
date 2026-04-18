@@ -27,10 +27,6 @@ def get_prompt_template(user_input: str) -> PromptTemplate:
             1. NGÔN NGỮ: BẠN PHẢI LUÔN LUÔN TRẢ LỜI BẰNG TIẾNG VIỆT (VIETNAMESE). TUYỆT ĐỐI KHÔNG ĐƯỢC SỬ DỤNG TIẾNG TRUNG HOẶC BẤT KỲ NGÔN NGỮ NÀO KHÁC.
             2. SỰ THẬT: Chỉ sử dụng thông tin xuất hiện trong phần Context. Nếu phần Context không chứa câu trả lời cho câu hỏi, bạn PHẢI trả lời chính xác là: "Xin lỗi, tài liệu không đề cập đến thông tin này."
             3. KHÔNG BỊA ĐẶT: Tuyệt đối không được tự suy diễn, không được dùng kiến thức bên ngoài Context để trả lời.
-                4. CÂU HỎI CẤU TRÚC TÀI LIỆU (ví dụ: "có bao nhiêu chương", "mục lục", "cấu trúc"): 
-                    - Chỉ kết luận khi Context có bằng chứng rõ ràng (tiêu đề chương/mục lục).
-                    - Nếu thiếu bằng chứng trực tiếp, phải trả lời: "Xin lỗi, tài liệu không đề cập đến thông tin này."
-                    - Khi có thể, trích ngắn các dòng bằng chứng trước khi kết luận.
 
             🚨 QUY TẮC ĐỊNH DẠNG TOÁN HỌC:
             - Nếu có công thức toán học, bạn PHẢI sử dụng LaTeX.
