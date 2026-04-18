@@ -6,3 +6,5 @@ faiss-cpu==1.9.0
 sentence-transformers
 pdfplumber
 pypdf
+langgraph
+langchain-google-genai
