@@ -13,7 +13,7 @@ def get_prompt_template(user_input: str) -> PromptTemplate:
     """
     if is_vietnamese(user_input):
         # Prompt cho tiếng Việt [cite: 240-247]
-        prompt_text = """
+        prompt_text = r"""
             Bạn là một chuyên gia phân tích tài liệu chuyên nghiệp.
             Nhiệm vụ của bạn là trả lời câu hỏi của người dùng DỰA VÀO DUY NHẤT ngữ cảnh (Context) được cung cấp dưới đây.
 
@@ -36,7 +36,7 @@ def get_prompt_template(user_input: str) -> PromptTemplate:
         """
     else:
         # Prompt cho tiếng Anh và ngôn ngữ khác [cite: 250-258]
-        prompt_text = """Use the following context to answer the question.
+        prompt_text = r"""Use the following context to answer the question.
         If you don't know the answer, just say you don't know.
         Keep answer concise (3-4 sentences).
         
