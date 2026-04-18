@@ -43,7 +43,7 @@ def main_chat_view(embedding_model, llm):
                 vector_db = create_vector_db(chunks, embedding_model)
                 save_vector_db(vector_db, db_path)
                 
-                st.session_state.retriever = get_retriever(vector_db)
+                st.session_state.retriever = get_retriever(vector_db, 2)
                 st.session_state.file_processed = True
                 st.session_state.current_file = uploaded_file.name
                 st.session_state.current_file_id = file_id
@@ -72,7 +72,7 @@ def main_chat_view(embedding_model, llm):
                     vector_db = create_vector_db(chunks, embedding_model)
                     save_vector_db(vector_db, db_path)
                 
-                st.session_state.retriever = get_retriever(vector_db)
+                st.session_state.retriever = get_retriever(vector_db, 2)
                 st.session_state.file_processed = True
                 st.session_state.current_file = target_file
                 st.session_state.current_file_id = target_id
