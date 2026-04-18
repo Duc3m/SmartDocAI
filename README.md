@@ -88,22 +88,47 @@ make run
 
 Dự án này được tối ưu để có thể tận dụng sức mạnh GPU (T4 16GB VRAM) miễn phí của Google Colab.
 
-1. Upload toàn bộ source code (hoặc dùng git clone) lên Google Colab.
-2. Chọn Runtime -> Change runtime type -> T4 GPU.
-3. Chạy đoạn mã khởi tạo sau trong Colab Notebook:
+1. Chọn Runtime -> Change runtime type -> T4 GPU.
+2. Chạy đoạn mã khởi tạo sau một lần duy nhất trong Colab Notebook:
 
 ```python
-# Cài đặt Ollama và Thư viện
-!curl -fsSL [https://ollama.com/install.sh](https://ollama.com/install.sh) | sh
-!make setup
-!pip install pyngrok
+!git clone https://github.com/Duc3m/SmartDocAI
 
-# Khởi động Ollama ngầm
+# Cài đặt Ollama và Thư viện
+!sudo apt install zstd
+!curl -fsSL https://ollama.com/install.sh | sh
 import subprocess, time, os
 with open(os.devnull, 'w') as fnull:
     subprocess.Popen(['ollama', 'serve'], stdout=fnull, stderr=fnull)
 time.sleep(10)
 !ollama pull qwen2.5:7b
+
+%cd /content/SmartDocAI
+
+!pip install -r requirements.txt
+!pip install pyngrok
+```
+
+3. Chạy đoạn mã sau mỗi khi muốn khởi động hệ thống
+
+```python
+import subprocess, time, os, socket
+
+def is_port_in_use(port):
+    """Kiểm tra xem port có đang sử dụng không"""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        return s.connect_ex(('localhost', port)) == 0
+
+# Chỉ khởi động nếu Ollama chưa chạy
+if not is_port_in_use(11434):
+    print("🚀 Đang khởi động Ollama server ngầm...")
+    with open(os.devnull, 'w') as fnull:
+        subprocess.Popen(['ollama', 'serve'], stdout=fnull, stderr=fnull)
+    time.sleep(10)
+else:
+    print("✅ Ollama đã chạy sẵn rồi, bỏ qua bước khởi động!")
+
+%cd /content/SmartDocAI
 
 # Tạo file .env cho Colab
 !echo 'LLM_MODEL_NAME="qwen2.5:7b"' > .env
@@ -116,8 +141,9 @@ ngrok.set_auth_token("YOUR_NGROK_AUTH_TOKEN") # Thay Token của bạn vào đâ
 public_url = ngrok.connect(8501).public_url
 print(f"Truy cập ứng dụng tại: {public_url}")
 
-!make run
+!streamlit run app.py --server.port 8501 --server.headless true --server.enableCORS false --server.enableXsrfProtection false
 ```
+
 ## 👥 Đội ngũ phát triển
 
 * Trần Đức Em
