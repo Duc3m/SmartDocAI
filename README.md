@@ -131,9 +131,9 @@ else:
 %cd /content/SmartDocAI
 
 # Tạo file .env cho Colab
+!echo 'EMBEDDING_MODEL="sentence-transformers/paraphrase-multilingual-mpnet-base-v2"' >> .env
 !echo 'LLM_MODEL_NAME="qwen2.5:7b"' > .env
 !echo 'OLLAMA_BASE_URL="http://localhost:11434"' >> .env
-!echo 'NUM_GPU=100' >> .env
 
 # Chạy ứng dụng qua Ngrok
 from pyngrok import ngrok
