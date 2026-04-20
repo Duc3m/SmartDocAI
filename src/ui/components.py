@@ -60,25 +60,40 @@ def render_sidebar():
                         st.rerun()
                         
                 with col2:
-                    if st.button("❌", key=f"del_{file['id']}", help="Xóa tài liệu này"):
-                        delete_file_record(file['id'])
-                        delete_chat_history(file['id'])
-                        
-                        # LOGIC MỚI: Nối ID vào tên file để xóa đúng file vật lý
-                        final_filename = f"{file['id']}_{file['filename']}"
-                        
-                        pdf_path = os.path.join("data", final_filename)
-                        if os.path.exists(pdf_path):
-                            os.remove(pdf_path)
-                            
-                        db_path = os.path.join("vector_db", f"{final_filename}_index")
-                        if os.path.exists(db_path):
-                            shutil.rmtree(db_path)
-                        
-                        if is_current:
-                            st.session_state.pop("current_file", None)
-                            st.session_state.pop("current_file_id", None)
-                            st.session_state.pop("file_processed", None)
-                            st.session_state.pop("retriever", None)
-                            st.session_state.messages = []
-                        st.rerun()
+                  if st.button("❌", key=f"del_btn_{file['id']}", help="Xóa tài liệu này"):
+                    confirm_delete_dialog(file['id'], file['filename'], is_current)
+
+@st.dialog("⚠️ Xác nhận xóa tài liệu")
+def confirm_delete_dialog(file_id, filename, is_current):
+    st.write(f"Bạn có chắc chắn muốn xóa tài liệu **{filename}** không?")
+    st.write("Hành động này không thể hoàn tác!")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("Hủy bỏ", use_container_width=True):
+            st.rerun() # Đóng popup
+            
+    with col2:
+        if st.button("Xóa ngay", type="primary", use_container_width=True):
+
+            delete_file_record(file_id)
+            delete_chat_history(file_id)
+            
+            final_filename = f"{file_id}_{filename}"
+            
+            pdf_path = os.path.join("data", final_filename)
+            if os.path.exists(pdf_path):
+                os.remove(pdf_path)
+                
+            db_path = os.path.join("vector_db", f"{final_filename}_index")
+            if os.path.exists(db_path):
+                shutil.rmtree(db_path)
+            
+            if is_current:
+                st.session_state.pop("current_file", None)
+                st.session_state.pop("current_file_id", None)
+                st.session_state.pop("file_processed", None)
+                st.session_state.pop("retriever", None)
+                st.session_state.messages = []
+                
+            st.rerun() # Xóa xong load lại trang
