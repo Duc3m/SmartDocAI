@@ -1,9 +1,107 @@
-from core.prompts import get_prompt_template
 from langchain_core.runnables import RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
 from langchain.globals import set_debug
+import operator
+from typing import Annotated, List, TypedDict
+from langgraph.graph import END, StateGraph
+from core.prompts import get_prompt_template, GRADER_PROMPT, REWRITE_PROMPT
+import streamlit as st
 
 set_debug(True)
+
+# 1. Định nghĩa trạng thái (State)
+class GraphState(TypedDict):
+    question: str          # Câu hỏi gốc của người dùng
+    search_query: str      # Câu hỏi dùng để search (có thể bị rewrite)
+    generation: str        # Kết quả cuối cùng
+    documents: List[str]   # Các đoạn văn bản tìm được
+    loop_count: int        # Số lần đã lặp lại
+
+# 2. Định nghĩa các Nodes
+def retrieve_node(state: GraphState):
+    question = state["search_query"]
+    # Truy xuất từ retriever trong session_state
+    documents = st.session_state.retriever.invoke(question)
+    return {"documents": documents}
+
+def grade_documents_node(state: GraphState):
+    from models.llm_config import get_llm
+    llm = get_llm()
+    
+    question = state["question"]
+    documents = state["documents"]
+    
+    grader_chain = GRADER_PROMPT | llm | StrOutputParser()
+    context = "\n\n".join(d.page_content for d in documents)
+    
+    score = grader_chain.invoke({"question": question, "context": context})
+    
+    # Trả về kết quả đánh giá thông qua một flag trong state (giả định dùng tạm documents làm flag)
+    if "YES" in score.upper():
+        return {"loop_count": state.get("loop_count", 0)} # Giữ nguyên
+    else:
+        return {"documents": []} # Xóa docs cũ để kích hoạt rewrite
+
+def rewrite_node(state: GraphState):
+    from models.llm_config import get_llm
+    llm = get_llm()
+    
+    question = state["question"]
+    count = state.get("loop_count", 0) + 1
+    
+    rewriter_chain = REWRITE_PROMPT | llm | StrOutputParser()
+    new_query = rewriter_chain.invoke({"question": question})
+    
+    return {"search_query": new_query, "loop_count": count}
+
+def generate_node(state: GraphState):
+    from models.llm_config import get_llm
+    llm = get_llm()
+    
+    question = state["question"]
+    documents = state["documents"]
+    context = "\n\n".join(d.page_content for d in documents) if documents else ""
+    
+    prompt_template = get_prompt_template(question)
+    gen_chain = prompt_template | llm | StrOutputParser()
+    
+    generation = gen_chain.invoke({"question": question, "context": context})
+    return {"generation": generation}
+
+# 3. Xây dựng và Compile Graph
+def create_crag_app():
+    workflow = StateGraph(GraphState)
+    
+    workflow.add_node("retrieve", retrieve_node)
+    workflow.add_node("grade", grade_documents_node)
+    workflow.add_node("rewrite", rewrite_node)
+    workflow.add_node("generate", generate_node)
+    
+    workflow.set_entry_point("retrieve")
+    workflow.add_edge("retrieve", "grade")
+    
+    def decide_to_generate(state):
+        # Nếu có tài liệu hoặc đã lặp quá 2 lần thì trả lời luôn
+        if state["documents"] or state.get("loop_count", 0) >= 2:
+            return "generate"
+        return "rewrite"
+    
+    workflow.add_conditional_edges("grade", decide_to_generate)
+    workflow.add_edge("rewrite", "retrieve")
+    workflow.add_edge("generate", END)
+    
+    return workflow.compile()
+
+# Hàm wrapper để UI gọi
+def answer_query_crag(user_input: str):
+    app = create_crag_app()
+    result = app.invoke({
+        "question": user_input,
+        "search_query": user_input,
+        "loop_count": 0,
+        "documents": []
+    })
+    return result["generation"]
 
 def format_docs(docs):
     """

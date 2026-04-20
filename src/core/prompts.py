@@ -2,17 +2,42 @@ from langchain_core.prompts import PromptTemplate
 
 def is_vietnamese(user_input: str) -> bool:
     """
-    Kiểm tra xem câu hỏi có chứa ký tự tiếng Việt có dấu hay không [cite: 231-233].
+    Kiểm tra xem câu hỏi có chứa ký tự tiếng Việt có dấu hay không.
     """
     vietnamese_chars = 'áàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđ'
     return any(char in user_input.lower() for char in vietnamese_chars)
 
+# --- PROMPT CHẤM ĐIỂM (CRAG EVALUATOR) ---
+GRADER_PROMPT = PromptTemplate.from_template(
+    """Bạn là một chuyên gia đánh giá mức độ liên quan của tài liệu.
+    Câu hỏi: {question}
+    Tài liệu: {context}
+    
+    Nhiệm vụ: Hãy xác định xem tài liệu trên có chứa thông tin để trả lời câu hỏi hay không.
+    - Nếu có: Trả lời duy nhất từ 'YES'.
+    - Nếu không: Trả lời duy nhất từ 'NO'.
+    
+    Kết quả:"""
+)
+
+# --- PROMPT VIẾT LẠI CÂU HỎI (REWRITE QUERY) ---
+REWRITE_PROMPT = PromptTemplate.from_template(
+    """Bạn là một chuyên gia tối ưu hóa truy vấn tìm kiếm.
+    Câu hỏi gốc: {question}
+    
+    Dữ liệu hiện tại không đủ để trả lời. Hãy viết lại câu hỏi này bằng tiếng Việt sao cho rõ ràng hơn.
+    LƯU Ý QUAN TRỌNG: Nếu người dùng yêu cầu "tóm tắt", "nội dung chính" của một phần/chương, hãy đổi câu hỏi thành yêu cầu trích xuất các chủ đề, từ khóa, hoặc ý chính của phần/chương đó thay vì chỉ dùng từ "tóm tắt".
+    
+    Chỉ trả về nội dung câu hỏi mới, không giải thích gì thêm.
+    Câu hỏi mới:"""
+)
+
 def get_prompt_template(user_input: str) -> PromptTemplate:
     """
-    Trả về PromptTemplate tối ưu dựa trên ngôn ngữ được phát hiện từ câu hỏi [cite: 230-264].
+    Trả về PromptTemplate tối ưu dựa trên ngôn ngữ được phát hiện từ câu hỏi.
     """
     if is_vietnamese(user_input):
-        # Prompt cho tiếng Việt [cite: 240-247]
+        # Prompt cho tiếng Việt (Giữ nguyên format cũ của bạn)
         prompt_text = r"""
             Bạn là một chuyên gia phân tích tài liệu chuyên nghiệp.
             Nhiệm vụ của bạn là trả lời câu hỏi của người dùng DỰA VÀO DUY NHẤT ngữ cảnh (Context) được cung cấp dưới đây.
@@ -35,18 +60,25 @@ def get_prompt_template(user_input: str) -> PromptTemplate:
             - TUYỆT ĐỐI KHÔNG dùng các ký hiệu như \[ \] hoặc \( \).
         """
     else:
-        # Prompt cho tiếng Anh và ngôn ngữ khác [cite: 250-258]
-        prompt_text = r"""Use the following context to answer the question.
-        If you don't know the answer, just say you don't know.
-        Keep answer concise (3-4 sentences).
-        
-        Context: {context}
-        
-        Question: {question}
-        
-        Answer:"""
-        
-    return PromptTemplate(
-        template=prompt_text,
-        input_variables=["context", "question"]
-    )
+        # Prompt cho tiếng Anh (Giữ nguyên format cũ của bạn)
+        prompt_text = r"""
+            You are a professional document analysis expert.
+            Your task is to answer the user's question based ONLY on the provided Context.
+
+            Context:
+            {context}
+
+            Question:
+            {question}
+
+            🚨 MANDATORY RULES:
+            1. LANGUAGE: Respond in the language of the question.
+            2. TRUTH: Use only information from the Context. If the answer is not in the Context, respond: "I'm sorry, the document does not mention this information."
+            3. NO HALLUCINATION: Do not use external knowledge.
+
+            🚨 MATH FORMATTING RULES:
+            - Use LaTeX for formulas.
+            - Use $$ for block formulas and $ for inline formulas.
+        """
+    
+    return PromptTemplate.from_template(prompt_text)
