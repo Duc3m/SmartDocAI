@@ -12,7 +12,7 @@ def main_chat_view(embedding_model, llm):
     # 1. QUẢN LÝ HIỂN THỊ UPLOAD
     if not st.session_state.get("file_processed"):
         st.markdown("### 📥 Tải lên tài liệu PDF để bắt đầu")
-        uploaded_file = st.file_uploader("Chọn tệp PDF của bạn", type=("pdf"), label_visibility="collapsed")
+        uploaded_file = st.file_uploader("Chọn tệp PDF của bạn", type=("pdf"), accept_multiple_files=False, label_visibility="collapsed")
         
         if uploaded_file:
             data_dir = "data"
