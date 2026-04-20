@@ -9,7 +9,7 @@ def get_embedding_model():
     Khởi tạo mô hình embedding đa ngôn ngữ từ HuggingFace[cite: 189, 340].
     """
     # Tên mô hình state-of-the-art cho tìm kiếm đa ngôn ngữ [cite: 202, 349]
-    model_name = os.getenv("EMBEDDING_MODEL", "sentence-transformers/paraphrase-multilingual-mpnet-base-v2")
+    model_name = os.getenv("EMBEDDING_MODEL", "paraphrase-multilingual-mpnet-base-v2")
     device = "cuda" if torch.cuda.is_available() else "cpu"
     
     # Chuẩn hóa vector về độ dài 1 để tính cosine similarity chính xác hơn [cite: 197, 350]
