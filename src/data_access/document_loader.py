@@ -1,6 +1,8 @@
 from langchain_community.document_loaders import PDFPlumberLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+from src.utils.timer import time_it
 
+@time_it
 def load_and_split_pdf(file_path):
     """
     Đọc nội dung PDF và chia nhỏ thành các chunks [cite: 142-143, 163-164].
