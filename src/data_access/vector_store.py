@@ -23,15 +23,13 @@ def load_vector_db(folder_path, embedding_model):
     """
     return FAISS.load_local(folder_path, embedding_model, allow_dangerous_deserialization=True)
 
-def get_retriever(vector_db, k=6, fetch_k=24, lambda_mult=0.7):
+def get_retriever(vector_db, k=6):
     """
     Tạo retriever với MMR để tăng độ bao phủ ngữ cảnh, đặc biệt cho câu hỏi tổng quan.
     """
     return vector_db.as_retriever(
-        search_type="mmr",
+        search_type="similarity",
         search_kwargs={
-            "k": k,
-            "fetch_k": fetch_k,
-            "lambda_mult": lambda_mult
+            "k": k
         }
     )

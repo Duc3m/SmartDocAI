@@ -78,6 +78,7 @@ def render_sidebar():
             st.session_state.pop("retriever", None)
             st.session_state.pop("selected_file_to_load", None)
             st.session_state.pop("selected_file_id_to_load", None)
+            st.filter_type = "Tất cả" # Reset filter về mặc định
             st.rerun()
             
         st.divider()
@@ -99,31 +100,57 @@ def render_sidebar():
         if not files:
             st.info("Chưa có tài liệu nào trong hệ thống.")
         else:
-            for file in files:
-                col1, col2 = st.columns([4, 1])
-                
-                with col1:
-                    is_current = st.session_state.get("current_file_id") == file['id']
+            # ---> BẮT ĐẦU PHẦN THÊM MỚI: Radio lọc tài liệu <---
+            filter_type = st.radio(
+                "Lọc tài liệu:",
+                ["Tất cả", "PDF", "DOCX"],
+                horizontal=True,
+                label_visibility="collapsed"
+            )
+
+            # Phân loại danh sách file dựa theo lựa chọn ở Radio
+            if filter_type == "PDF":
+                filtered_files = [f for f in files if f['filename'].lower().endswith('.pdf')]
+            elif filter_type == "DOCX":
+                filtered_files = [f for f in files if f['filename'].lower().endswith(('.docx', '.doc'))]
+            else:
+                filtered_files = files
+            # ---> KẾT THÚC PHẦN THÊM MỚI <---
+
+            # Kiểm tra xem sau khi lọc có còn file nào không
+            if not filtered_files:
+                st.info(f"Không có tài liệu {filter_type} nào.")
+            else:
+                # ---> LƯU Ý: Vòng lặp đổi từ `files` thành `filtered_files` <---
+                for file in filtered_files:
+                    col1, col2 = st.columns([4, 1])
                     
-                    display_name = file['filename']
-                    if len(display_name) > 20:
-                        display_name = display_name[:17] + "..."
+                    with col1:
+                        is_current = st.session_state.get("current_file_id") == file['id']
                         
-                    btn_type = "primary" if is_current else "secondary"
-                    btn_label = f"📄 {display_name}"
-                    
-                    if st.button(
-                        btn_label, 
-                        key=f"sel_{file['id']}", 
-                        help=f"{file['filename']} (ID: {file['id']})",
-                        use_container_width=True,
-                        type=btn_type
-                    ):
-                        st.session_state.selected_file_to_load = file['filename']
-                        st.session_state.selected_file_id_to_load = file['id']
-                        st.rerun()
+                        display_name = file['filename']
+                        ext = display_name.split('.')[-1]
+
+                        if len(display_name) > 20:
+                            display_name = display_name[:17] + "..."
+                            
+                        icon = "📄" if ext == "pdf" else ("📝" if ext == "docx" else "📎")
+                            
+                        btn_type = "primary" if is_current else "secondary"
+                        btn_label = f"{icon} {display_name}" # Kẹp icon vào tên hiển thị
                         
-                with col2:
-                    # Nút bấm mở Dialog Xóa 1 File
-                    if st.button("❌", key=f"del_btn_{file['id']}", help="Xóa tài liệu này"):
-                        confirm_delete_dialog(mode="single", file_id=file['id'], filename=file['filename'], is_current=is_current)
+                        if st.button(
+                            btn_label, 
+                            key=f"sel_{file['id']}", 
+                            help=f"{file['filename']} (ID: {file['id']})",
+                            use_container_width=True,
+                            type=btn_type
+                        ):
+                            st.session_state.selected_file_to_load = file['filename']
+                            st.session_state.selected_file_id_to_load = file['id']
+                            st.rerun()
+                            
+                    with col2:
+                        # Nút bấm mở Dialog Xóa 1 File
+                        if st.button("❌", key=f"del_btn_{file['id']}", help="Xóa tài liệu này"):
+                            confirm_delete_dialog(mode="single", file_id=file['id'], filename=file['filename'], is_current=is_current)
