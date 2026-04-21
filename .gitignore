@@ -15,3 +15,6 @@ vector_db/*
 # Cấu hình IDE (Nếu bạn dùng VS Code hoặc PyCharm)
 .vscode/
 .idea/
+
+# Log files
+logs/*

@@ -157,7 +157,7 @@ ngrok.set_auth_token("YOUR_NGROK_AUTH_TOKEN") # Thay Token của bạn vào đâ
 public_url = ngrok.connect(8501).public_url
 print(f"Truy cập ứng dụng tại: {public_url}")
 
-!streamlit run app.py --server.port 8501 --server.headless true --server.enableCORS false --server.enableXsrfProtection false
+!streamlit run app.py --server.port 8501 --server.headless true --server.enableCORS false --server.enableXsrfProtection false --server.fileWatcherType none
 ```
 
 ## 👥 Đội ngũ phát triển
