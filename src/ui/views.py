@@ -4,6 +4,7 @@ import time
 from data_access.document_loader import load_and_split_pdf
 from data_access.vector_store import create_vector_db, get_retriever, save_vector_db, load_vector_db
 from core.rag_pipeline import answer_query
+from core.rag_pipeline import answer_query_crag
 from data_access.database import get_chat_history, insert_file_metadata, insert_message
 from utils.file_process import process_new_uploaded_file, switch_to_existing_file
 
@@ -42,6 +43,12 @@ def main_chat_view(embedding_model, llm):
     if st.session_state.get("file_processed") and st.session_state.get("current_file"):
         st.info(f"🤖 Đang làm việc với file: **{st.session_state.current_file}**")
     st.divider()
+    rag_mode = st.radio(
+    "Chế độ xử lý:",
+    ["RAG Thường", "Recursive CRAG (LangGraph)"],
+    horizontal=True,
+    help="CRAG sẽ tự động kiểm tra tài liệu và tìm kiếm lại nếu dữ liệu không liên quan."
+)
 
     # 4. MÀN HÌNH HIỂN THỊ CHAT
     if "messages" not in st.session_state:
@@ -66,11 +73,13 @@ def main_chat_view(embedding_model, llm):
             st.markdown(prompt)
 
         with st.chat_message("assistant"):
-            with st.spinner("Đang suy nghĩ..."):
-                # Gọi hàm và đợi lấy toàn bộ kết quả
-                full_response = answer_query(prompt, st.session_state.retriever, llm)
-                # In kết quả ra màn hình một lần duy nhất
-                st.markdown(full_response)
+            with st.spinner("Đang xử lý..." if rag_mode == "RAG Thường" else "Đang kiểm duyệt và tối ưu dữ liệu..."):
+                if rag_mode == "Recursive CRAG (LangGraph)":
+                    full_response = answer_query_crag(prompt)
+                else:
+                    full_response = answer_query(prompt, st.session_state.retriever, llm)
+            
+            st.markdown(full_response)
                 
         # Lưu vào DB và Session State
         insert_message(file_id, "assistant", full_response)
