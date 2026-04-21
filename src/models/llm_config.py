@@ -1,6 +1,6 @@
 import os
 import streamlit as st
-from langchain_community.chat_models import ChatOllama
+from langchain_ollama import ChatOllama
 
 @st.cache_resource
 def get_llm():
@@ -16,7 +16,6 @@ def get_llm():
             temperature=0.3,               # Độ sáng tạo của câu trả lời [cite: 373]
             top_p=0.9,                     # Nucleus sampling để lọc các từ có xác suất thấp [cite: 373]
             num_thread=8,
-            num_gpu=100,
             num_ctx=2048,
             repeat_penalty=1.1             # Hạn chế việc mô hình bị lặp từ trong câu trả lời [cite: 374]
         )

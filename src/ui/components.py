@@ -3,6 +3,63 @@ import os
 import shutil
 from data_access.database import delete_chat_history, get_all_files, delete_file_record
 
+def perform_delete(file_id, filename, is_current):
+    """Thực thi việc xóa vật lý và dọn dẹp bộ nhớ cho 1 file cụ thể."""
+    # 1. Xóa trong Database
+    delete_file_record(file_id)
+    delete_chat_history(file_id)
+    
+    # 2. Xóa File PDF và Thư mục FAISS
+    final_filename = f"{file_id}_{filename}"
+    
+    pdf_path = os.path.join("data", final_filename)
+    if os.path.exists(pdf_path):
+        os.remove(pdf_path)
+        
+    db_path = os.path.join("vector_db", f"{final_filename}_index")
+    if os.path.exists(db_path):
+        shutil.rmtree(db_path)
+    
+    # 3. Dọn dẹp Session nếu đang mở đúng file bị xóa
+    if is_current:
+        st.session_state.pop("current_file", None)
+        st.session_state.pop("current_file_id", None)
+        st.session_state.pop("file_processed", None)
+        st.session_state.pop("retriever", None)
+        st.session_state.messages = []
+
+@st.dialog("⚠️ Xác nhận xóa")
+def confirm_delete_dialog(mode="single", file_id=None, filename=None, is_current=False, all_files=None):
+    """
+    Hộp thoại dùng chung cho cả 2 trường hợp: Xóa 1 file và Xóa tất cả.
+    """
+    # Hiển thị câu cảnh báo tùy theo chế độ
+    if mode == "single":
+        st.write(f"Bạn có chắc chắn muốn xóa tài liệu **{filename}** không?")
+    else:
+        st.write("Bạn có chắc chắn muốn xóa **TẤT CẢ** tài liệu và lịch sử chat không?")
+        
+    st.write("Hành động này không thể hoàn tác!")
+    
+    # Hai nút bấm xác nhận
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("Hủy bỏ", use_container_width=True):
+            st.rerun() # Đóng popup
+            
+    with col2:
+        if st.button("Xóa ngay", type="primary", use_container_width=True):
+            if mode == "single":
+                # Gọi hàm xóa 1 file
+                perform_delete(file_id, filename, is_current)
+            elif mode == "all" and all_files:
+                # Vòng lặp gọi hàm xóa cho toàn bộ file
+                for f in all_files:
+                    is_curr = st.session_state.get("current_file_id") == f['id']
+                    perform_delete(f['id'], f['filename'], is_curr)
+            
+            st.rerun() # Load lại trang sau khi xóa xong
+
 def render_sidebar():
     """Hiển thị quản lý file và lịch sử chat bên trái"""
     with st.sidebar:
@@ -10,7 +67,6 @@ def render_sidebar():
         st.subheader("Intelligent Document Q&A System")
         
         # --- 1. NÚT TẠO CUỘC TRÒ CHUYỆN MỚI ---
-        # Đặt ở vị trí đầu tiên, dùng type="primary" để có màu nổi bật
         is_new_chat = not st.session_state.get("current_file_id")
         new_chat_btn_type = "primary" if is_new_chat else "secondary"
 
@@ -26,10 +82,20 @@ def render_sidebar():
             
         st.divider()
 
-        # --- 2. QUẢN LÝ FILE ---
-        st.title("📁 Lịch sử tài liệu")
+        # Lấy danh sách file trước để UI xử lý logic hiển thị
         files = get_all_files()
-        
+
+        # --- 2. TIÊU ĐỀ VÀ NÚT XÓA TẤT CẢ (Nằm ngang) ---
+        col_title, col_btn = st.columns([4, 1], vertical_alignment="center")
+        with col_title:
+            st.markdown("### 📁 Lịch sử tài liệu")
+            
+        with col_btn:
+            if files: # Chỉ hiện nút xóa tất cả nếu có ít nhất 1 file
+                if st.button("🗑️", help="Xóa TẤT CẢ tài liệu", key="btn_del_all"):
+                    confirm_delete_dialog(mode="all", all_files=files)
+
+        # --- 3. HIỂN THỊ DANH SÁCH TỪNG FILE ---
         if not files:
             st.info("Chưa có tài liệu nào trong hệ thống.")
         else:
@@ -39,7 +105,6 @@ def render_sidebar():
                 with col1:
                     is_current = st.session_state.get("current_file_id") == file['id']
                     
-                    # CẮT NGẮN TÊN FILE: Giới hạn 20 ký tự để không bị tràn nút bấm
                     display_name = file['filename']
                     if len(display_name) > 20:
                         display_name = display_name[:17] + "..."
@@ -47,7 +112,6 @@ def render_sidebar():
                     btn_type = "primary" if is_current else "secondary"
                     btn_label = f"📄 {display_name}"
                     
-                    # Thêm help=file['filename'] để khi rê chuột vào sẽ thấy tên đầy đủ
                     if st.button(
                         btn_label, 
                         key=f"sel_{file['id']}", 
@@ -60,40 +124,6 @@ def render_sidebar():
                         st.rerun()
                         
                 with col2:
-                  if st.button("❌", key=f"del_btn_{file['id']}", help="Xóa tài liệu này"):
-                    confirm_delete_dialog(file['id'], file['filename'], is_current)
-
-@st.dialog("⚠️ Xác nhận xóa tài liệu")
-def confirm_delete_dialog(file_id, filename, is_current):
-    st.write(f"Bạn có chắc chắn muốn xóa tài liệu **{filename}** không?")
-    st.write("Hành động này không thể hoàn tác!")
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("Hủy bỏ", use_container_width=True):
-            st.rerun() # Đóng popup
-            
-    with col2:
-        if st.button("Xóa ngay", type="primary", use_container_width=True):
-
-            delete_file_record(file_id)
-            delete_chat_history(file_id)
-            
-            final_filename = f"{file_id}_{filename}"
-            
-            pdf_path = os.path.join("data", final_filename)
-            if os.path.exists(pdf_path):
-                os.remove(pdf_path)
-                
-            db_path = os.path.join("vector_db", f"{final_filename}_index")
-            if os.path.exists(db_path):
-                shutil.rmtree(db_path)
-            
-            if is_current:
-                st.session_state.pop("current_file", None)
-                st.session_state.pop("current_file_id", None)
-                st.session_state.pop("file_processed", None)
-                st.session_state.pop("retriever", None)
-                st.session_state.messages = []
-                
-            st.rerun() # Xóa xong load lại trang
+                    # Nút bấm mở Dialog Xóa 1 File
+                    if st.button("❌", key=f"del_btn_{file['id']}", help="Xóa tài liệu này"):
+                        confirm_delete_dialog(mode="single", file_id=file['id'], filename=file['filename'], is_current=is_current)

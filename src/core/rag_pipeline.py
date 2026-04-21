@@ -1,47 +1,43 @@
 from core.prompts import get_prompt_template
 from langchain_core.runnables import RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
-from langchain.globals import set_debug
+from langchain_core.globals import set_debug
+from src.utils.logger import log_to_file
+from src.utils.timer import time_it
 
-set_debug(True)
+set_debug(False)
 
 def format_docs(docs):
     """
-    Kết hợp nội dung các chunks được tìm thấy thành một chuỗi context liền mạch[cite: 153].
+    Kết hợp nội dung các chunks được tìm thấy thành một chuỗi context liền mạch.
     """
     return "\n\n".join(doc.page_content for doc in docs)
 
-def create_rag_chain(retriever, llm, user_input: str):
-    """
-    Khởi tạo RAG Chain kết nối Bộ truy xuất (Retriever), Prompt và Mô hình sinh (Generator) [cite: 68-74, 116].
-    """
-    # 1. Khởi tạo prompt động dựa trên ngôn ngữ đầu vào [cite: 155, 260]
-    prompt = get_prompt_template(user_input)
-    
-    # 2. Xây dựng pipeline xử lý [cite: 127-128]
-    # - "context": Lấy câu hỏi -> retriever tìm kiếm -> format_docs gộp văn bản
-    # - "question": Chuyển tiếp (Passthrough) trực tiếp câu hỏi của người dùng
-    rag_chain = (
-        {"context": retriever | format_docs, "question": RunnablePassthrough()}
-        | prompt
-        | llm
-        | StrOutputParser() # Parse output trực tiếp ra dạng string
-    )
-    
-    return rag_chain
+@log_to_file
+def retrieve_relevant_docs(user_input, retriever):
+    # Lấy ra các chunk liên quan nhất từ FAISS
+    return retriever.invoke(user_input)
+
+@log_to_file
+def generate_final_prompt(user_input, retriever):
+    docs = retrieve_relevant_docs(user_input, retriever)
+    context = format_docs(docs)
+    prompt_template = get_prompt_template(user_input)
+    return prompt_template.format(context=context, question=user_input)
+
+@log_to_file
+def generate_llm_answer(formatted_prompt, llm):
+    # Gọi LLM để sinh câu trả lời dựa trên prompt đã định dạng.
+    return llm.invoke(formatted_prompt)
 
 def answer_query(user_input: str, retriever, llm):
     """
-    Hàm thực thi toàn bộ luồng RAG và trả về câu trả lời cuối cùng [cite: 156-157].
+    Hàm thực thi toàn bộ luồng RAG và trả về câu trả lời cuối cùng.
     """
     try:
-        # Tạo chain cho ngữ cảnh hiện tại
-        chain = create_rag_chain(retriever, llm, user_input)
-        # with open('context.txt', 'a', encoding='utf-8') as file:
-        #     file.write(chain + "\n\n=*50")
-        # Dùng .invoke() để lấy toàn bộ câu trả lời
-        response = chain.invoke(user_input)
-        
+        final_prompt = generate_final_prompt(user_input, retriever)
+        response = generate_llm_answer(final_prompt, llm)
+
         # Xử lý nếu kết quả trả về là đối tượng thay vì chuỗi
         if hasattr(response, 'content'):
             return response.content

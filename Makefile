@@ -34,7 +34,7 @@ stop-model:
 
 # 3. Khởi chạy ứng dụng
 run:
-	PYTHONPATH=src $(VENV)/bin/streamlit run app.py --server.headless true
+	PYTHONPATH=src $(VENV)/bin/streamlit run app.py --server.headless true --server.fileWatcherType none
 
 # 4. Dọn dẹp project (xóa cache và venv)
 clean:
