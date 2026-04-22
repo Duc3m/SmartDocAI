@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 load_dotenv()
 sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
 
+from src.ui.styles import inject_custom_css
 import streamlit as st
 from models.embedding_config import get_embedding_model
 from models.llm_config import get_llm
@@ -36,13 +37,14 @@ def main():
     embedding_model = get_embedding_model()
     llm = get_llm()
     
+    inject_custom_css()
     # Cấu trúc giao diện mới: Trái (Sidebar) và Phải (Main)
     render_sidebar()
     
     if llm is None:
         st.error("Không thể kết nối với Ollama. Vui lòng kiểm tra ứng dụng Ollama đã chạy chưa!")
         return
-
+    
     # Khu vực chính
     main_chat_view(embedding_model, llm)
 

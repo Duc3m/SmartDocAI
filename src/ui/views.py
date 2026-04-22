@@ -15,59 +15,30 @@ def main_chat_view(embedding_model, llm):
     if "processing_mode" not in st.session_state:
         st.session_state.processing_mode = "RAG Thường"
 
-    st.markdown("""
-        <style>
-        /* 1. Ép Popover trôi nổi ở dưới cùng, sát trên thanh chat_input */
-        .st-key-mode_selector {
-            position: fixed;
-            top: 0.7rem; /* Cách đỉnh màn hình 1 đoạn vừa đủ qua header mặc định */
-            z-index: 999999;
-        }
-        
-        /* 2. Làm đẹp nút bấm bên ngoài: Bo tròn viên thuốc, thêm bóng đổ (Giống Gemini) */
-        .st-key-mode_selector > div[data-testid="stPopover"] > button {
-            border-radius: 30px !important; /* Bo tròn hoàn toàn */
-            padding: 4px 16px !important; /* Thu gọn nút lại cho tinh tế */
-            border: 1px solid rgba(128, 128, 128, 0.2) !important;
-            background-color: var(--background-color) !important;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.1) !important;
-            transition: all 0.2s ease-in-out;
-        }
-        
-        /* Hiệu ứng nổi lên khi rê chuột vào */
-        .st-key-mode_selector > div[data-testid="stPopover"] > button:hover {
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
-            border-color: rgba(128, 128, 128, 0.4) !important;
-            transform: translateY(-2px);
-        }
-
-        /* 3. Chỉnh form bên trong menu xổ xuống cho bo tròn và mượt mà */
-        .stPopoverBody {
-            padding: 10px !important;
-            border-radius: 16px !important;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.15) !important;
-        }
-        </style>
-    """, unsafe_allow_html=True)
-
     rag_mode = st.session_state.processing_mode
-    mode_icon = "✨" if "CRAG" in rag_mode else "⚡"
+    mode_icon = ":material/auto_awesome:" if "CRAG" in rag_mode else ":material/bolt:"
     
     with st.popover(f"{mode_icon} **{rag_mode}**", key="mode_selector"):
         
         # Nút lựa chọn 1: RAG Thường
-        if st.button("⚡ **RAG Thường**", use_container_width=True):
+        if st.button("**RAG Thường**", 
+                     icon=":material/bolt:", 
+                     key="btn_mode_rag", 
+                     use_container_width=True):
             st.session_state.processing_mode = "RAG Thường"
             st.rerun() # Load lại trang ngay lập tức để nhận mode mới
             
         # Nút lựa chọn 2: CRAG
-        if st.button("✨ **Recursive CRAG**", use_container_width=True):
-            st.session_state.processing_mode = "Recursive CRAG (LangGraph)"
+        if st.button("**Recursive CRAG**", 
+                     icon=":material/auto_awesome:", 
+                     key="btn_mode_crag", 
+                     use_container_width=True):
+            st.session_state.processing_mode = "Recursive CRAG"
             st.rerun()
     
     # 1. GIAO DIỆN UPLOAD
     if not st.session_state.get("file_processed"):
-        st.markdown("### 📥 Tải lên tài liệu PDF/DOCX để bắt đầu")
+        st.markdown("### :material/upload_file: Tải lên tài liệu PDF/DOCX để bắt đầu")
         uploaded_file = st.file_uploader(
             "Chọn tệp PDF/DOCX của bạn", 
             type=("pdf", "docx"), 
@@ -95,7 +66,7 @@ def main_chat_view(embedding_model, llm):
 
     # 3. THÔNG TIN FILE ĐANG CHAT
     if st.session_state.get("file_processed") and st.session_state.get("current_file"):
-        st.info(f"🤖 Đang làm việc với file: **{st.session_state.current_file}**")
+        st.info(f":material/smart_toy: Đang làm việc với file: **{st.session_state.current_file}**")
     st.divider()
 #     rag_mode = st.radio(
 #     "Chế độ xử lý:",

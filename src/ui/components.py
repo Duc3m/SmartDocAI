@@ -63,14 +63,18 @@ def confirm_delete_dialog(mode="single", file_id=None, filename=None, is_current
 def render_sidebar():
     """Hiển thị quản lý file và lịch sử chat bên trái"""
     with st.sidebar:
-        st.title("🚀 SmartDoc AI")
-        st.subheader("Intelligent Document Q&A System")
+        st.markdown("# :material/rocket_launch: SmartDoc AI")
+        st.subheader("Intelligent Document Q&A")
         
         # --- 1. NÚT TẠO CUỘC TRÒ CHUYỆN MỚI ---
         is_new_chat = not st.session_state.get("current_file_id")
         new_chat_btn_type = "primary" if is_new_chat else "secondary"
 
-        if st.button("Tạo cuộc trò chuyện mới", use_container_width=True, type=new_chat_btn_type):
+        if st.button("Tạo cuộc trò chuyện mới", 
+                     key="btn_new_chat", 
+                     use_container_width=True, 
+                     type=new_chat_btn_type,
+                     icon=":material/add_box:"):
             st.session_state.messages = []
             st.session_state.pop("current_file", None)
             st.session_state.pop("current_file_id", None)
@@ -89,11 +93,14 @@ def render_sidebar():
         # --- 2. TIÊU ĐỀ VÀ NÚT XÓA TẤT CẢ (Nằm ngang) ---
         col_title, col_btn = st.columns([4, 1], vertical_alignment="center")
         with col_title:
-            st.markdown("### 📁 Lịch sử tài liệu")
+            st.markdown("### :material/folder_open: Lịch sử tài liệu")
             
         with col_btn:
             if files: # Chỉ hiện nút xóa tất cả nếu có ít nhất 1 file
-                if st.button("🗑️", help="Xóa TẤT CẢ tài liệu", key="btn_del_all"):
+                if st.button("\u200B", 
+                             icon=":material/delete_sweep:", 
+                             help="Xóa TẤT CẢ tài liệu", 
+                             key="btn_del_all"):
                     confirm_delete_dialog(mode="all", all_files=files)
 
         # --- 3. HIỂN THỊ DANH SÁCH TỪNG FILE ---
@@ -130,18 +137,25 @@ def render_sidebar():
                         
                         display_name = file['filename']
                         ext = display_name.split('.')[-1]
+                        btn_key = f"{ext}_{file['id']}"
 
                         if len(display_name) > 20:
                             display_name = display_name[:17] + "..."
                             
-                        icon = "📄" if ext == "pdf" else ("📝" if ext == "docx" else "📎")
+                        # BỘ NHẬN DIỆN ICON CHUẨN GOOGLE MATERIAL
+                        if ext == "pdf":
+                            file_icon = ":material/picture_as_pdf:" 
+                        elif ext in ["docx", "doc"]:
+                            file_icon = ":material/description:"
+                        else:
+                            file_icon = ":material/insert_drive_file:"
                             
                         btn_type = "primary" if is_current else "secondary"
-                        btn_label = f"{icon} {display_name}" # Kẹp icon vào tên hiển thị
                         
                         if st.button(
-                            btn_label, 
-                            key=f"sel_{file['id']}", 
+                            display_name,
+                            icon=file_icon, 
+                            key=btn_key, 
                             help=f"{file['filename']} (ID: {file['id']})",
                             use_container_width=True,
                             type=btn_type
@@ -152,5 +166,8 @@ def render_sidebar():
                             
                     with col2:
                         # Nút bấm mở Dialog Xóa 1 File
-                        if st.button("❌", key=f"del_btn_{file['id']}", help="Xóa tài liệu này"):
+                        if st.button("\u200B", 
+                                     icon=":material/close:", 
+                                     key=f"del_btn_{file['id']}", 
+                                     help="Xóa tài liệu này"):
                             confirm_delete_dialog(mode="single", file_id=file['id'], filename=file['filename'], is_current=is_current)
