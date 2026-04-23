@@ -1,12 +1,70 @@
 import streamlit as st
 import os
 import time
+import re
+import html
 from data_access.document_loader import load_and_split_document
 from data_access.vector_store import create_vector_db, get_retriever, save_vector_db, load_vector_db
 from core.rag_pipeline import answer_query
 from core.rag_pipeline import answer_query_crag
 from data_access.database import get_chat_history, insert_file_metadata, insert_message
 from utils.file_process import process_new_uploaded_file, switch_to_existing_file
+
+
+def _highlight_context(context: str, quote: str) -> str:
+    safe_context = context or ""
+    safe_quote = (quote or "").strip()
+
+    if not safe_context:
+        return ""
+    if not safe_quote:
+        return f"<div style='white-space: pre-wrap;'>{html.escape(safe_context)}</div>"
+
+    match = re.search(re.escape(safe_quote), safe_context, flags=re.IGNORECASE)
+    if not match:
+        return f"<div style='white-space: pre-wrap;'>{html.escape(safe_context)}</div>"
+
+    start, end = match.span()
+    return (
+        "<div style='white-space: pre-wrap;'>"
+        + html.escape(safe_context[:start])
+        + f"<mark>{html.escape(safe_context[start:end])}</mark>"
+        + html.escape(safe_context[end:])
+        + "</div>"
+    )
+
+
+def _render_citations(citations):
+    if not citations:
+        return
+
+    st.markdown("##### 📚 Nguồn tham chiếu")
+    for index, citation in enumerate(citations, start=1):
+        source_id = citation.get("source_id", f"S{index}")
+        file_name = citation.get("file_name", "Unknown")
+        page = citation.get("page")
+        position = citation.get("position", {}) or {}
+        chunk_id = citation.get("chunk_id", "N/A")
+        quote = citation.get("quote", "")
+        context = citation.get("context", "")
+
+        start_pos = position.get("start")
+        end_pos = position.get("end")
+        page_text = f"trang {page}" if isinstance(page, int) else "trang N/A"
+        if isinstance(start_pos, int) and isinstance(end_pos, int):
+            pos_text = f"vị trí {start_pos}-{end_pos}"
+        else:
+            pos_text = "vị trí N/A"
+
+        with st.expander(f"[{source_id}] {file_name} • {page_text} • chunk {chunk_id}"):
+            st.caption(f"{page_text} • {pos_text}")
+            if quote:
+                st.markdown(f"**Đoạn được dùng:** _{quote}_")
+
+            highlighted = _highlight_context(context, quote)
+            if highlighted:
+                st.markdown(highlighted, unsafe_allow_html=True)
+
 
 def main_chat_view(embedding_model, llm):
     """Khu vực màn hình trả lời và công cụ"""
@@ -79,9 +137,11 @@ def main_chat_view(embedding_model, llm):
     if "messages" not in st.session_state:
         st.session_state.messages = []
 
-    for message in st.session_state.messages:
+    for index, message in enumerate(st.session_state.messages):
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
+            if message["role"] == "assistant":
+                _render_citations(message.get("citations", []))
 
     # 5. Ô NHẬP LIỆU
     if prompt := st.chat_input("Hỏi bất cứ điều gì về tài liệu..."):
@@ -103,12 +163,20 @@ def main_chat_view(embedding_model, llm):
                     full_response = answer_query_crag(prompt, file_id)
                 else:
                     full_response = answer_query(prompt,file_id, st.session_state.retriever, llm)
-            
-            st.markdown(full_response)
+
+            if isinstance(full_response, dict):
+                answer_text = full_response.get("answer", "")
+                citations = full_response.get("citations", [])
+            else:
+                answer_text = str(full_response)
+                citations = []
+
+            st.markdown(answer_text)
+            _render_citations(citations)
                 
         # Lưu vào DB và Session State
-        insert_message(file_id, "assistant", full_response)
-        st.session_state.messages.append({"role": "assistant", "content": full_response})
+        insert_message(file_id, "assistant", answer_text)
+        st.session_state.messages.append({"role": "assistant", "content": answer_text, "citations": citations})
         st.rerun()
 
 def format_latex_for_streamlit(text):

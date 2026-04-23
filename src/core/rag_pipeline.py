@@ -1,14 +1,15 @@
-from langchain_core.runnables import RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.globals import set_debug
-import operator
-from typing import Annotated, List, TypedDict
+from typing import Any, Dict, List, TypedDict
 from langgraph.graph import END, StateGraph
-from core.prompts import get_prompt_template, GRADER_PROMPT, REWRITE_PROMPT
+from core.prompts import get_prompt_template, get_citation_prompt_template, GRADER_PROMPT, REWRITE_PROMPT
 import streamlit as st
 from src.utils.logger import log_to_file
 from src.utils.timer import time_it
 from data_access.database import get_chat_history
+import json
+import os
+import re
 
 
 set_debug(False)
@@ -18,10 +19,151 @@ class GraphState(TypedDict):
     question: str
     search_query: str
     chat_history: List[dict]
-    generation: str
-    documents: List[str]
+    generation: Dict[str, Any]
+    documents: List[Any]
     loop_count: int
     max_loops: int
+
+
+def _history_to_string(chat_history: List[dict], max_items: int = 5) -> str:
+    history_str = ""
+    if chat_history:
+        for msg in chat_history[-max_items:]:
+            role = "Người dùng" if msg["role"] == "user" else "Trợ lý"
+            history_str += f"{role}: {msg['content']}\n"
+    return history_str
+
+
+def _build_context_bundle(documents: List[Any]) -> tuple[str, Dict[str, Dict[str, Any]]]:
+    context_blocks = []
+    source_map: Dict[str, Dict[str, Any]] = {}
+
+    for index, doc in enumerate(documents, start=1):
+        metadata = doc.metadata or {}
+        source_id = f"S{index}"
+        source_path = metadata.get("source") or metadata.get("file_name") or "Unknown"
+        file_name = os.path.basename(source_path)
+
+        page_value = metadata.get("page")
+        if isinstance(page_value, int):
+            page_number = page_value + 1
+        else:
+            page_number = None
+
+        char_start = metadata.get("char_start", metadata.get("start_index"))
+        char_end = metadata.get("char_end")
+        if isinstance(char_start, int) and not isinstance(char_end, int):
+            char_end = char_start + len(doc.page_content)
+
+        source_map[source_id] = {
+            "source_id": source_id,
+            "file_name": file_name,
+            "page": page_number,
+            "position": {
+                "start": char_start,
+                "end": char_end,
+            },
+            "chunk_id": metadata.get("chunk_id", index),
+            "context": doc.page_content,
+        }
+
+        position_text = "N/A"
+        if isinstance(char_start, int) and isinstance(char_end, int):
+            position_text = f"{char_start}-{char_end}"
+
+        page_text = str(page_number) if page_number is not None else "N/A"
+        context_blocks.append(
+            "\n".join(
+                [
+                    f"[{source_id}]",
+                    f"file: {file_name}",
+                    f"page: {page_text}",
+                    f"position: {position_text}",
+                    f"chunk_id: {source_map[source_id]['chunk_id']}",
+                    "content:",
+                    doc.page_content,
+                ]
+            )
+        )
+
+    return "\n\n".join(context_blocks), source_map
+
+
+def _safe_parse_json(raw_text: str) -> Dict[str, Any]:
+    cleaned = raw_text.strip()
+    if cleaned.startswith("```"):
+        cleaned = re.sub(r"^```(?:json)?", "", cleaned, flags=re.IGNORECASE).strip()
+        cleaned = re.sub(r"```$", "", cleaned).strip()
+
+    try:
+        return json.loads(cleaned)
+    except Exception:
+        pass
+
+    match = re.search(r"\{[\s\S]*\}", cleaned)
+    if match:
+        try:
+            return json.loads(match.group(0))
+        except Exception:
+            pass
+
+    return {"answer": raw_text.strip(), "citations": []}
+
+
+def _normalize_citation_payload(
+    llm_output: str,
+    source_map: Dict[str, Dict[str, Any]],
+    fallback_answer: str | None = None,
+) -> Dict[str, Any]:
+    parsed = _safe_parse_json(llm_output)
+    answer = parsed.get("answer") if isinstance(parsed, dict) else None
+    if not isinstance(answer, str) or not answer.strip():
+        answer = fallback_answer or llm_output.strip()
+
+    normalized_citations = []
+    citations = parsed.get("citations", []) if isinstance(parsed, dict) else []
+    if not isinstance(citations, list):
+        citations = []
+
+    for citation in citations:
+        if not isinstance(citation, dict):
+            continue
+        source_id = str(citation.get("source_id", "")).strip()
+        quote = str(citation.get("quote", "")).strip()
+        if source_id not in source_map:
+            continue
+
+        source_payload = source_map[source_id]
+        normalized_citations.append(
+            {
+                "source_id": source_id,
+                "file_name": source_payload["file_name"],
+                "page": source_payload["page"],
+                "position": source_payload["position"],
+                "chunk_id": source_payload["chunk_id"],
+                "quote": quote,
+                "context": source_payload["context"],
+            }
+        )
+
+    return {
+        "answer": answer.strip(),
+        "citations": normalized_citations,
+    }
+
+
+def _generate_cited_answer(question: str, documents: List[Any], chat_history: str, llm) -> Dict[str, Any]:
+    context, source_map = _build_context_bundle(documents)
+    prompt_template = get_citation_prompt_template(question)
+    gen_chain = prompt_template | llm | StrOutputParser()
+    raw_generation = gen_chain.invoke(
+        {
+            "question": question,
+            "context": context,
+            "chat_history": chat_history,
+        }
+    )
+    return _normalize_citation_payload(raw_generation, source_map)
 
 # 2. Định nghĩa các Nodes
 def retrieve_node(state: GraphState):
@@ -75,12 +217,8 @@ def generate_node(state: GraphState):
     question = state["question"]
     documents = state["documents"]
     chat_history = state["chat_history"]
-    context = "\n\n".join(d.page_content for d in documents) if documents else ""
-    
-    prompt_template = get_prompt_template(question)
-    gen_chain = prompt_template | llm | StrOutputParser()
-    
-    generation = gen_chain.invoke({"question": question, "context": context, "chat_history": chat_history})
+
+    generation = _generate_cited_answer(question, documents, chat_history, llm)
     return {"generation": generation}
 
 def decide_to_generate(state):
@@ -112,11 +250,7 @@ def answer_query_crag(user_input: str,file_id: int, max_loops: int = 3):
     # Lấy lịch sử chat của file hiện tại
     chat_history = get_chat_history(file_id)
 
-    history_str = ""
-    if chat_history:
-        for msg in chat_history[-5:]: # Chỉ lấy 5 tin nhắn gần nhất để tránh tràn context
-            role = "Người dùng" if msg["role"] == "user" else "Trợ lý"
-            history_str += f"{role}: {msg['content']}\n"
+    history_str = _history_to_string(chat_history)
 
     app = create_crag_app()
     result = app.invoke({
@@ -143,11 +277,7 @@ def retrieve_relevant_docs(user_input, retriever):
 
 @log_to_file
 def generate_final_prompt(user_input, retriever,chat_history=None):
-    history_str = ""
-    if chat_history:
-        for msg in chat_history[-5:]: # Chỉ lấy 5 tin nhắn gần nhất để tránh tràn context
-            role = "Người dùng" if msg["role"] == "user" else "Trợ lý"
-            history_str += f"{role}: {msg['content']}\n"
+    history_str = _history_to_string(chat_history)
     docs = retrieve_relevant_docs(user_input, retriever)
     context = format_docs(docs)
     prompt_template = get_prompt_template(user_input)
@@ -165,13 +295,9 @@ def answer_query(user_input: str, file_id ,retriever, llm):
     try:
     # Lấy lịch sử chat của file hiện tại
         history = get_chat_history(file_id)
-        final_prompt = generate_final_prompt(user_input, retriever,history)
-        response = generate_llm_answer(final_prompt, llm)
-
-        # Xử lý nếu kết quả trả về là đối tượng thay vì chuỗi
-        if hasattr(response, 'content'):
-            return response.content
-        return str(response)
+        docs = retrieve_relevant_docs(user_input, retriever)
+        history_str = _history_to_string(history)
+        return _generate_cited_answer(user_input, docs, history_str, llm)
         
     except Exception as e:
         error_msg = str(e).lower()

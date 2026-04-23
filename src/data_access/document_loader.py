@@ -31,4 +31,15 @@ def load_and_split_document(file_path):
     
     # 3. Thực hiện chia nhỏ [cite: 179-180]
     chunks = text_splitter.split_documents(documents)
+
+    file_name = os.path.basename(file_path)
+    for index, chunk in enumerate(chunks, start=1):
+        chunk.metadata = chunk.metadata or {}
+        chunk.metadata["chunk_id"] = index
+        chunk.metadata["file_name"] = file_name
+        start_index = chunk.metadata.get("start_index")
+        if isinstance(start_index, int):
+            chunk.metadata["char_start"] = start_index
+            chunk.metadata["char_end"] = start_index + len(chunk.page_content)
+
     return chunks
