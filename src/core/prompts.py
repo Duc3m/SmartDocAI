@@ -22,25 +22,31 @@ GRADER_PROMPT = PromptTemplate.from_template(
 
 # --- PROMPT VIẾT LẠI CÂU HỎI (REWRITE QUERY) ---
 REWRITE_PROMPT = PromptTemplate.from_template(
-    """Bạn là một chuyên gia tối ưu hóa truy vấn tìm kiếm.
+    """Bạn là một chuyên gia tối ưu hóa truy vấn cho Vector Database.
     Câu hỏi gốc: {question}
+    Lịch sử chat: {chat_history}
     
-    Dữ liệu hiện tại không đủ để trả lời. Hãy viết lại câu hỏi này bằng tiếng Việt sao cho rõ ràng hơn.
-    LƯU Ý QUAN TRỌNG: Nếu người dùng yêu cầu "tóm tắt", "nội dung chính" của một phần/chương, hãy đổi câu hỏi thành yêu cầu trích xuất các chủ đề, từ khóa, hoặc ý chính của phần/chương đó thay vì chỉ dùng từ "tóm tắt".
+    Hãy viết lại câu hỏi này thành các TỪ KHÓA (keywords) cốt lõi để tìm kiếm hiệu quả nhất. 
+    Nếu câu hỏi yêu cầu "tóm tắt" hoặc "nội dung chính" của một phần, hãy liệt kê các danh từ/thuật ngữ quan trọng nhất có thể xuất hiện trong phần đó.
     
-    Chỉ trả về nội dung câu hỏi mới, không giải thích gì thêm.
-    Câu hỏi mới:"""
+    Chỉ trả về chuỗi từ khóa mới (cách nhau bởi dấu phẩy), không giải thích.
+    Từ khóa tìm kiếm:"""
 )
 
 def get_prompt_template(user_input: str) -> PromptTemplate:
     """
     Trả về PromptTemplate tối ưu dựa trên ngôn ngữ được phát hiện từ câu hỏi.
     """
+
+
     if is_vietnamese(user_input):
         # Prompt cho tiếng Việt (Giữ nguyên format cũ của bạn)
         prompt_text = r"""
             Bạn là một chuyên gia phân tích tài liệu chuyên nghiệp.
             Nhiệm vụ của bạn là trả lời câu hỏi của người dùng DỰA VÀO DUY NHẤT ngữ cảnh (Context) được cung cấp dưới đây.
+
+            chat history:
+            {chat_history}
 
             Context:
             {context}
@@ -64,6 +70,9 @@ def get_prompt_template(user_input: str) -> PromptTemplate:
         prompt_text = r"""
             You are a professional document analysis expert.
             Your task is to answer the user's question based ONLY on the provided Context.
+
+            chat history:
+            {chat_history}
 
             Context:
             {context}

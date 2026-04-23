@@ -99,10 +99,10 @@ def main_chat_view(embedding_model, llm):
 
         with st.chat_message("assistant"):
             with st.spinner("Đang xử lý..." if rag_mode == "RAG Thường" else "Đang kiểm duyệt và tối ưu dữ liệu..."):
-                if rag_mode == "Recursive CRAG (LangGraph)":
-                    full_response = answer_query_crag(prompt)
+                if rag_mode == "Recursive CRAG":
+                    full_response = answer_query_crag(prompt, file_id)
                 else:
-                    full_response = answer_query(prompt, st.session_state.retriever, llm)
+                    full_response = answer_query(prompt,file_id, st.session_state.retriever, llm)
             
             st.markdown(full_response)
                 
