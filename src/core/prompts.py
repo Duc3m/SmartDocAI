@@ -91,3 +91,71 @@ def get_prompt_template(user_input: str) -> PromptTemplate:
         """
     
     return PromptTemplate.from_template(prompt_text)
+
+def get_citation_prompt_template(user_input: str) -> PromptTemplate:
+        """
+        Prompt yêu cầu LLM trả về JSON có answer + citations theo source_id.
+        """
+        if is_vietnamese(user_input):
+                prompt_text = r"""
+                        Bạn là một chuyên gia phân tích tài liệu chuyên nghiệp.
+                        Nhiệm vụ của bạn là trả lời câu hỏi DỰA VÀO DUY NHẤT Context được cung cấp.
+
+                        Chat history:
+                        {chat_history}
+
+                        Context:
+                        {context}
+
+                        Question:
+                        {question}
+
+                        QUY TẮC BẮT BUỘC:
+                        1) Chỉ dùng thông tin trong Context.
+                        2) Nếu không có thông tin, trả lời đúng: "Xin lỗi, tài liệu không đề cập đến thông tin này."
+                        3) Trả lời bằng tiếng Việt.
+                        4) Mỗi luận điểm quan trọng trong câu trả lời nên gắn citation theo source_id có trong Context (ví dụ: S1, S2).
+                        5) Trường quote phải là đoạn trích NGẮN, chính xác từ context gốc.
+                        6) Chỉ trả về JSON hợp lệ, KHÔNG thêm markdown hay giải thích.
+
+                        ĐỊNH DẠNG JSON BẮT BUỘC:
+                        {{
+                            "answer": "...",
+                            "citations": [
+                                {{"source_id": "S1", "quote": "..."}},
+                                {{"source_id": "S3", "quote": "..."}}
+                            ]
+                        }}
+                """
+        else:
+                prompt_text = r"""
+                        You are a professional document analysis assistant.
+                        Answer the question using ONLY the provided context.
+
+                        Chat history:
+                        {chat_history}
+
+                        Context:
+                        {context}
+
+                        Question:
+                        {question}
+
+                        MANDATORY RULES:
+                        1) Use only information from the Context.
+                        2) If the answer is missing in Context, answer exactly: "I'm sorry, the document does not mention this information."
+                        3) Attach citations using only source_id values that appear in Context (e.g., S1, S2).
+                        4) quote must be a short exact span from the context.
+                        5) Return valid JSON only, with no markdown wrappers.
+
+                        REQUIRED JSON FORMAT:
+                        {{
+                            "answer": "...",
+                            "citations": [
+                                {{"source_id": "S1", "quote": "..."}},
+                                {{"source_id": "S2", "quote": "..."}}
+                            ]
+                        }}
+                """
+
+        return PromptTemplate.from_template(prompt_text)
