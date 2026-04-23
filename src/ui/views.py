@@ -1,7 +1,7 @@
 import streamlit as st
 import os
 import time
-from data_access.document_loader import load_and_split_pdf
+from data_access.document_loader import load_and_split_document
 from data_access.vector_store import create_vector_db, get_retriever, save_vector_db, load_vector_db
 from core.rag_pipeline import answer_query
 from core.rag_pipeline import answer_query_crag
@@ -10,13 +10,38 @@ from utils.file_process import process_new_uploaded_file, switch_to_existing_fil
 
 def main_chat_view(embedding_model, llm):
     """Khu vực màn hình trả lời và công cụ"""
+
+    # Thiết lập trạng thái ban đầu cho chế độ xử lý (RAG Thường hoặc CRAG)
+    if "processing_mode" not in st.session_state:
+        st.session_state.processing_mode = "RAG Thường"
+
+    rag_mode = st.session_state.processing_mode
+    mode_icon = ":material/auto_awesome:" if "CRAG" in rag_mode else ":material/bolt:"
+    
+    with st.popover(f"{mode_icon} **{rag_mode}**", key="mode_selector"):
+        
+        # Nút lựa chọn 1: RAG Thường
+        if st.button("**RAG Thường**", 
+                     icon=":material/bolt:", 
+                     key="btn_mode_rag", 
+                     use_container_width=True):
+            st.session_state.processing_mode = "RAG Thường"
+            st.rerun() # Load lại trang ngay lập tức để nhận mode mới
+            
+        # Nút lựa chọn 2: CRAG
+        if st.button("**Recursive CRAG**", 
+                     icon=":material/auto_awesome:", 
+                     key="btn_mode_crag", 
+                     use_container_width=True):
+            st.session_state.processing_mode = "Recursive CRAG"
+            st.rerun()
     
     # 1. GIAO DIỆN UPLOAD
     if not st.session_state.get("file_processed"):
-        st.markdown("### 📥 Tải lên tài liệu PDF để bắt đầu")
+        st.markdown("### :material/upload_file: Tải lên tài liệu PDF/DOCX để bắt đầu")
         uploaded_file = st.file_uploader(
-            "Chọn tệp PDF của bạn", 
-            type=("pdf"), 
+            "Chọn tệp PDF/DOCX của bạn", 
+            type=("pdf", "docx"), 
             accept_multiple_files=False, 
             label_visibility="collapsed"
         )
@@ -41,14 +66,14 @@ def main_chat_view(embedding_model, llm):
 
     # 3. THÔNG TIN FILE ĐANG CHAT
     if st.session_state.get("file_processed") and st.session_state.get("current_file"):
-        st.info(f"🤖 Đang làm việc với file: **{st.session_state.current_file}**")
+        st.info(f":material/smart_toy: Đang làm việc với file: **{st.session_state.current_file}**")
     st.divider()
-    rag_mode = st.radio(
-    "Chế độ xử lý:",
-    ["RAG Thường", "Recursive CRAG (LangGraph)"],
-    horizontal=True,
-    help="CRAG sẽ tự động kiểm tra tài liệu và tìm kiếm lại nếu dữ liệu không liên quan."
-)
+#     rag_mode = st.radio(
+#     "Chế độ xử lý:",
+#     ["RAG Thường", "Recursive CRAG (LangGraph)"],
+#     horizontal=True,
+#     help="CRAG sẽ tự động kiểm tra tài liệu và tìm kiếm lại nếu dữ liệu không liên quan."
+# )
 
     # 4. MÀN HÌNH HIỂN THỊ CHAT
     if "messages" not in st.session_state:

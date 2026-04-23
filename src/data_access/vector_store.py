@@ -23,11 +23,13 @@ def load_vector_db(folder_path, embedding_model):
     """
     return FAISS.load_local(folder_path, embedding_model, allow_dangerous_deserialization=True)
 
-def get_retriever(vector_db, k=3):
+def get_retriever(vector_db, k=6):
     """
-    Tạo bộ truy xuất (retriever) để tìm top k đoạn văn bản liên quan nhất [cite: 214-219].
+    Tạo retriever với MMR để tăng độ bao phủ ngữ cảnh, đặc biệt cho câu hỏi tổng quan.
     """
     return vector_db.as_retriever(
-        search_type="similarity", # Tìm kiếm dựa trên độ tương đồng vector [cite: 218]
-        search_kwargs={"k": k}    # Lấy ra 3 kết quả tốt nhất mặc định [cite: 219]
+        search_type="similarity",
+        search_kwargs={
+            "k": k
+        }
     )

@@ -1,14 +1,25 @@
+import os
+
 from langchain_community.document_loaders import PDFPlumberLoader
+from langchain_community.document_loaders import Docx2txtLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from src.utils.timer import time_it
 
 @time_it
-def load_and_split_pdf(file_path):
+def load_and_split_document(file_path):
     """
     Đọc nội dung PDF và chia nhỏ thành các chunks [cite: 142-143, 163-164].
     """
-    # 1. Load tài liệu bằng PDFPlumber để giữ layout và bảng biểu 
-    loader = PDFPlumberLoader(file_path)
+    # 1. Xác định đuôi file để chọn đúng Loader
+    ext = os.path.splitext(file_path)[1].lower()
+    
+    if ext == '.pdf':
+        loader = PDFPlumberLoader(file_path)
+    elif ext in ['.docx', '.doc']:
+        loader = Docx2txtLoader(file_path)
+    else:
+        raise ValueError(f"Định dạng {ext} chưa được hỗ trợ!")
+
     documents = loader.load()
     
     # 2. Cấu hình bộ cắt văn bản [cite: 173-178]

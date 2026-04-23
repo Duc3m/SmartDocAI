@@ -1,6 +1,6 @@
 from langchain_core.runnables import RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
-from langchain.globals import set_debug
+from langchain_core.globals import set_debug
 import operator
 from typing import Annotated, List, TypedDict
 from langgraph.graph import END, StateGraph

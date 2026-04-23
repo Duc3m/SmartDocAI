@@ -9,3 +9,4 @@ pdfplumber
 pypdf
 langgraph
 langchain-google-genai
+docx2txt
