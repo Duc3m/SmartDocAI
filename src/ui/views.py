@@ -3,12 +3,89 @@ import os
 import time
 import re
 import html
+import unicodedata
 from data_access.document_loader import load_and_split_document
 from data_access.vector_store import create_vector_db, get_retriever, save_vector_db, load_vector_db
 from core.rag_pipeline import answer_query
 from core.rag_pipeline import answer_query_crag
 from data_access.database import get_chat_history, insert_file_metadata, insert_message
 from utils.file_process import process_new_uploaded_file, switch_to_existing_file
+
+
+def _find_exact_or_whitespace_span(context: str, quote: str):
+    exact_match = re.search(re.escape(quote), context, flags=re.IGNORECASE)
+    if exact_match:
+        return exact_match.span()
+
+    quote_tokens = re.findall(r"\S+", quote)
+    if not quote_tokens:
+        return None
+
+    whitespace_flexible_pattern = r"\s+".join(re.escape(token) for token in quote_tokens)
+    soft_match = re.search(whitespace_flexible_pattern, context, flags=re.IGNORECASE)
+    if soft_match:
+        return soft_match.span()
+    return None
+
+
+def _normalize_for_loose_match(text: str):
+    normalized_chars = []
+    index_map = []
+    prev_is_space = False
+
+    for original_index, char in enumerate(text):
+        category = unicodedata.category(char)
+
+        if char.isspace():
+            if not prev_is_space:
+                normalized_chars.append(" ")
+                index_map.append(original_index)
+                prev_is_space = True
+            continue
+
+        if category.startswith("P"):
+            continue
+
+        normalized_chars.append(char.lower())
+        index_map.append(original_index)
+        prev_is_space = False
+
+    raw_normalized = "".join(normalized_chars)
+    if not raw_normalized.strip():
+        return "", []
+
+    left_trim = len(raw_normalized) - len(raw_normalized.lstrip())
+    right_boundary = len(raw_normalized.rstrip())
+    normalized_text = raw_normalized[left_trim:right_boundary]
+    trimmed_index_map = index_map[left_trim:right_boundary]
+    return normalized_text, trimmed_index_map
+
+
+def _find_loose_span(context: str, quote: str):
+    normalized_context, context_map = _normalize_for_loose_match(context)
+    normalized_quote, _ = _normalize_for_loose_match(quote)
+
+    if not normalized_context or not normalized_quote:
+        return None
+
+    start_index = normalized_context.find(normalized_quote)
+    if start_index == -1:
+        return None
+
+    end_index = start_index + len(normalized_quote) - 1
+    if start_index >= len(context_map) or end_index >= len(context_map):
+        return None
+
+    original_start = context_map[start_index]
+    original_end = context_map[end_index] + 1
+    return original_start, original_end
+
+
+def _find_best_span(context: str, quote: str):
+    span = _find_exact_or_whitespace_span(context, quote)
+    if span:
+        return span
+    return _find_loose_span(context, quote)
 
 
 def _highlight_context(context: str, quote: str) -> str:
@@ -20,11 +97,11 @@ def _highlight_context(context: str, quote: str) -> str:
     if not safe_quote:
         return f"<div style='white-space: pre-wrap;'>{html.escape(safe_context)}</div>"
 
-    match = re.search(re.escape(safe_quote), safe_context, flags=re.IGNORECASE)
-    if not match:
+    span = _find_best_span(safe_context, safe_quote)
+    if not span:
         return f"<div style='white-space: pre-wrap;'>{html.escape(safe_context)}</div>"
 
-    start, end = match.span()
+    start, end = span
     return (
         "<div style='white-space: pre-wrap;'>"
         + html.escape(safe_context[:start])
@@ -72,27 +149,77 @@ def main_chat_view(embedding_model, llm):
     # Thiết lập trạng thái ban đầu cho chế độ xử lý (RAG Thường hoặc CRAG)
     if "processing_mode" not in st.session_state:
         st.session_state.processing_mode = "RAG Thường"
+    if "chunk_size" not in st.session_state:
+        st.session_state.chunk_size = 600
+    if "chunk_overlap" not in st.session_state:
+        st.session_state.chunk_overlap = 100
 
     rag_mode = st.session_state.processing_mode
     mode_icon = ":material/auto_awesome:" if "CRAG" in rag_mode else ":material/bolt:"
-    
-    with st.popover(f"{mode_icon} **{rag_mode}**", key="mode_selector"):
-        
-        # Nút chọn RAG Thường
-        if st.button("**RAG Thường**", 
-                     icon=":material/bolt:", 
-                     key="btn_mode_rag", 
-                     use_container_width=True):
-            st.session_state.processing_mode = "RAG Thường"
-            st.rerun()
+    is_new_chat_screen = not st.session_state.get("current_file_id")
+
+    if is_new_chat_screen:
+        control_col_mode, control_col_chunk = st.columns([1, 2], vertical_alignment="center")
+
+        with control_col_mode:
+            with st.popover(f"{mode_icon} **{rag_mode}**", key="mode_selector"):
             
-        # Nút chọn CRAG
-        if st.button("**Recursive CRAG**", 
-                     icon=":material/auto_awesome:", 
-                     key="btn_mode_crag", 
-                     use_container_width=True):
-            st.session_state.processing_mode = "Recursive CRAG"
-            st.rerun()
+                # Nút chọn RAG Thường
+                if st.button("**RAG Thường**", 
+                            icon=":material/bolt:", 
+                            key="btn_mode_rag", 
+                            use_container_width=True):
+                    st.session_state.processing_mode = "RAG Thường"
+                    st.rerun() # Load lại trang ngay lập tức để nhận mode mới
+                    
+                # Nút chọn CRAG
+                if st.button("**Recursive CRAG**", 
+                            icon=":material/auto_awesome:", 
+                            key="btn_mode_crag", 
+                            use_container_width=True):
+                    st.session_state.processing_mode = "Recursive CRAG"
+                    st.rerun()
+
+        with control_col_chunk:
+            chunk_col_1, chunk_col_2 = st.columns(2)
+            with chunk_col_1:
+                chunk_size_value = st.number_input(
+                    "Chunk size",
+                    min_value=100,
+                    max_value=2000,
+                    step=50,
+                    value=int(st.session_state.chunk_size),
+                    key="chunk_size_input",
+                    help="Số ký tự tối đa cho mỗi chunk."
+                )
+            with chunk_col_2:
+                chunk_overlap_value = st.number_input(
+                    "Chunk overlap",
+                    min_value=0,
+                    max_value=200,
+                    step=10,
+                    value=int(st.session_state.chunk_overlap),
+                    key="chunk_overlap_input",
+                    help="Số ký tự chồng lấn giữa các chunk liên tiếp."
+                )
+
+            st.session_state.chunk_size = int(chunk_size_value)
+            st.session_state.chunk_overlap = int(chunk_overlap_value)
+    else:
+        with st.popover(f"{mode_icon} **{rag_mode}**", key="mode_selector"):
+            if st.button("**RAG Thường**", 
+                        icon=":material/bolt:", 
+                        key="btn_mode_rag", 
+                        use_container_width=True):
+                st.session_state.processing_mode = "RAG Thường"
+                st.rerun()
+
+            if st.button("**Recursive CRAG**", 
+                        icon=":material/auto_awesome:", 
+                        key="btn_mode_crag", 
+                        use_container_width=True):
+                st.session_state.processing_mode = "Recursive CRAG"
+                st.rerun()
     
     # GIAO DIỆN UPLOAD
     if not st.session_state.get("file_processed"):
@@ -105,7 +232,12 @@ def main_chat_view(embedding_model, llm):
         )
         if uploaded_file:
             with st.status(f"Đang xử lý '{uploaded_file.name}'...", expanded=True) as status:
-                process_new_uploaded_file(uploaded_file, embedding_model)
+                process_new_uploaded_file(
+                    uploaded_file,
+                    embedding_model,
+                    chunk_size=st.session_state.chunk_size,
+                    chunk_overlap=st.session_state.chunk_overlap,
+                )
                 status.update(label="Tài liệu đã sẵn sàng!", state="complete", expanded=False)
             st.rerun()
 
@@ -114,7 +246,13 @@ def main_chat_view(embedding_model, llm):
     if target_id and target_id != st.session_state.get("current_file_id"):
         target_file = st.session_state.selected_file_to_load
         with st.status(f"Đang tải lại '{target_file}'...", expanded=True):
-            success = switch_to_existing_file(target_id, target_file, embedding_model) # Gọi hàm logic 
+            success = switch_to_existing_file(
+                target_id,
+                target_file,
+                embedding_model,
+                chunk_size=st.session_state.chunk_size,
+                chunk_overlap=st.session_state.chunk_overlap,
+            ) # Gọi hàm logic 
         if success:
             st.rerun()
         else:
