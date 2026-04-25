@@ -6,6 +6,7 @@ from core.prompts import get_prompt_template, get_citation_prompt_template, GRAD
 import streamlit as st
 from src.utils.logger import log_to_file
 from src.utils.timer import time_it
+from models.llm_config import get_llm
 from data_access.database import get_chat_history
 import json
 import os
@@ -14,7 +15,7 @@ import re
 
 set_debug(False)
 
-# 1. Định nghĩa trạng thái (State)
+# Định nghĩa kiểu dữ liệu cho trạng thái của Graph
 class GraphState(TypedDict):
     question: str
     search_query: str
@@ -24,8 +25,8 @@ class GraphState(TypedDict):
     loop_count: int
     max_loops: int
 
-
 def _history_to_string(chat_history: List[dict], max_items: int = 5) -> str:
+    """Chuyển đổi lịch sử chat thành một chuỗi định dạng."""
     history_str = ""
     if chat_history:
         for msg in chat_history[-max_items:]:
@@ -35,9 +36,14 @@ def _history_to_string(chat_history: List[dict], max_items: int = 5) -> str:
 
 
 def _build_context_bundle(documents: List[Any]) -> tuple[str, Dict[str, Dict[str, Any]]]:
+    """Kết hợp nội dung các chunks được tìm thấy thành một chuỗi context liền mạch, 
+đồng thời xây dựng source_map để ánh xạ thông tin nguồn."""
+
+    # Mỗi document sẽ được đánh dấu bằng một source_id duy nhất (S1, S2, S3, ...)
     context_blocks = []
     source_map: Dict[str, Dict[str, Any]] = {}
 
+    # Duyệt qua từng document và xây dựng context + source_map
     for index, doc in enumerate(documents, start=1):
         metadata = doc.metadata or {}
         source_id = f"S{index}"
@@ -50,11 +56,13 @@ def _build_context_bundle(documents: List[Any]) -> tuple[str, Dict[str, Dict[str
         else:
             page_number = None
 
+        # Xác định vị trí char_start và char_end
         char_start = metadata.get("char_start", metadata.get("start_index"))
         char_end = metadata.get("char_end")
         if isinstance(char_start, int) and not isinstance(char_end, int):
             char_end = char_start + len(doc.page_content)
 
+        # Cập nhật source_map với thông tin chi tiết về nguồn tài liệu
         source_map[source_id] = {
             "source_id": source_id,
             "file_name": file_name,
@@ -67,10 +75,12 @@ def _build_context_bundle(documents: List[Any]) -> tuple[str, Dict[str, Dict[str
             "context": doc.page_content,
         }
 
+        # Định dạng thông tin nguồn cho mỗi block context
         position_text = "N/A"
         if isinstance(char_start, int) and isinstance(char_end, int):
             position_text = f"{char_start}-{char_end}"
 
+        # Nếu page_number không xác định được, hiển thị "N/A"
         page_text = str(page_number) if page_number is not None else "N/A"
         context_blocks.append(
             "\n".join(
@@ -90,16 +100,22 @@ def _build_context_bundle(documents: List[Any]) -> tuple[str, Dict[str, Dict[str
 
 
 def _safe_parse_json(raw_text: str) -> Dict[str, Any]:
+    """Trích xuất JSON từ output của LLM một cách an toàn, 
+    xử lý các trường hợp không hợp lệ."""
+
+    # Loại bỏ các ký tự không cần thiết và cố gắng trích xuất JSON
     cleaned = raw_text.strip()
     if cleaned.startswith("```"):
         cleaned = re.sub(r"^```(?:json)?", "", cleaned, flags=re.IGNORECASE).strip()
         cleaned = re.sub(r"```$", "", cleaned).strip()
 
+    # Thử parse trực tiếp
     try:
         return json.loads(cleaned)
     except Exception:
         pass
 
+    # Nếu parse trực tiếp thất bại, cố gắng trích xuất phần JSON từ chuỗi
     match = re.search(r"\{[\s\S]*\}", cleaned)
     if match:
         try:
@@ -115,16 +131,21 @@ def _normalize_citation_payload(
     source_map: Dict[str, Dict[str, Any]],
     fallback_answer: str | None = None,
 ) -> Dict[str, Any]:
+    """Chuẩn hóa kết quả trả về từ LLM, đảm bảo có cấu trúc answer + citations hợp lệ."""
+
+    # Trích xuất JSON một cách an toàn
     parsed = _safe_parse_json(llm_output)
     answer = parsed.get("answer") if isinstance(parsed, dict) else None
     if not isinstance(answer, str) or not answer.strip():
         answer = fallback_answer or llm_output.strip()
 
+    # Chuẩn hóa phần citations, đảm bảo mỗi citation có đầy đủ thông tin từ source_map
     normalized_citations = []
     citations = parsed.get("citations", []) if isinstance(parsed, dict) else []
     if not isinstance(citations, list):
         citations = []
 
+    # Duyệt qua từng citation và bổ sung thông tin từ source_map
     for citation in citations:
         if not isinstance(citation, dict):
             continue
@@ -133,6 +154,7 @@ def _normalize_citation_payload(
         if source_id not in source_map:
             continue
 
+        # Bổ sung thông tin chi tiết về nguồn tài liệu từ source_map
         source_payload = source_map[source_id]
         normalized_citations.append(
             {
@@ -151,8 +173,15 @@ def _normalize_citation_payload(
         "citations": normalized_citations,
     }
 
+def _generate_cited_answer(
+        question: str, 
+        documents: List[Any], 
+        chat_history: str, 
+        llm
+    ) -> Dict[str, Any]:
+    """Sinh câu trả lời có trích dẫn dựa trên question, documents liên quan, và chat_history."""
 
-def _generate_cited_answer(question: str, documents: List[Any], chat_history: str, llm) -> Dict[str, Any]:
+    # Xây dựng context bundle và source_map từ documents
     context, source_map = _build_context_bundle(documents)
     prompt_template = get_citation_prompt_template(question)
     gen_chain = prompt_template | llm | StrOutputParser()
@@ -165,7 +194,7 @@ def _generate_cited_answer(question: str, documents: List[Any], chat_history: st
     )
     return _normalize_citation_payload(raw_generation, source_map)
 
-# 2. Định nghĩa các Nodes
+# Định nghĩa các node cho CRAG
 def retrieve_node(state: GraphState):
     print(f"🟢 [NODE: RETRIEVE] Đang tìm kiếm (Vòng lặp: {state.get('loop_count', 0)})")
     question = state["search_query"]
@@ -173,11 +202,13 @@ def retrieve_node(state: GraphState):
     documents = st.session_state.retriever.invoke(question)
     return {"documents": documents}
 
+# Node đánh giá mức độ liên quan của tài liệu
 def grade_documents_node(state: GraphState):
-    from models.llm_config import get_llm
+    
     print("🟡 [NODE: GRADE] Đang chấm điểm tài liệu...")
     llm = get_llm()
     
+    # Lấy question, context (từ documents), và chat_history để đánh giá
     question = state["question"]
     documents = state["documents"]
     
@@ -187,16 +218,16 @@ def grade_documents_node(state: GraphState):
     score = grader_chain.invoke({"question": question, "context": context})
     
     if "YES" in score.upper():
-        # Đánh dấu là đã tìm thấy context tốt, có thể dùng một biến cờ
+        # Đánh dấu là đã tìm thấy context tốt
         print("   -> Kết quả: ĐẠT (Chuyển sang Generate)")
         return {"documents": documents, "is_relevant": True}
     else:
-        # KHÔNG XÓA documents. Giữ lại để làm fallback nếu chạm max_loops
+        # Không đạt, cần rewrite câu hỏi để tìm kiếm lại
         print("   -> Kết quả: KHÔNG ĐẠT (Cần Rewrite)")
         return {"documents": documents, "is_relevant": False}
 
+# Node viết lại câu hỏi để tìm kiếm hiệu quả hơn
 def rewrite_node(state: GraphState):
-    from models.llm_config import get_llm
     print("🟠 [NODE: REWRITE] Đang viết lại câu hỏi...")
     llm = get_llm()
     
@@ -204,38 +235,39 @@ def rewrite_node(state: GraphState):
     count = state.get("loop_count", 0) + 1
     chat_history = state["chat_history"]
     
+    # Tạo câu truy vấn mới dựa trên câu hỏi gốc và lịch sử chat
     rewriter_chain = REWRITE_PROMPT | llm | StrOutputParser()
     new_query = rewriter_chain.invoke({"question": question, "chat_history": chat_history})
     
     return {"search_query": new_query, "loop_count": count}
 
 def generate_node(state: GraphState):
-    from models.llm_config import get_llm
     print("🔵 [NODE: GENERATE] Đang sinh câu trả lời cuối cùng...")
     llm = get_llm()
     
     question = state["question"]
     documents = state["documents"]
     chat_history = state["chat_history"]
-
+    # Sinh câu trả lời cuối cùng dựa trên question, documents liên quan, và chat_history
     generation = _generate_cited_answer(question, documents, chat_history, llm)
     return {"generation": generation}
 
 def decide_to_generate(state):
-    # Nếu documents liên quan, HOẶC đã hết số lần lặp cho phép -> Trả lời
+    # Quyết định dựa trên kết quả đánh giá của node "grade"
     if state.get("is_relevant", False) or state.get("loop_count", 0) >= state.get("max_loops", 3):
         return "generate"
     return "rewrite"
 
-# 3. Xây dựng và Compile Graph
+# Hàm để tạo và biên dịch workflow CRAG
 def create_crag_app():
     workflow = StateGraph(GraphState)
     
+    # Thêm các node vào workflow
     workflow.add_node("retrieve", retrieve_node)
     workflow.add_node("grade", grade_documents_node)
     workflow.add_node("rewrite", rewrite_node)
     workflow.add_node("generate", generate_node)
-    
+    # Định nghĩa luồng điều khiển giữa các node
     workflow.set_entry_point("retrieve")
     workflow.add_edge("retrieve", "grade")
     
@@ -245,13 +277,14 @@ def create_crag_app():
     
     return workflow.compile()
 
-# Hàm wrapper để UI gọi
+# Hàm chính để trả lời câu hỏi bằng CRAG
 def answer_query_crag(user_input: str,file_id: int, max_loops: int = 3):
     # Lấy lịch sử chat của file hiện tại
     chat_history = get_chat_history(file_id)
-
+    # Chuyển lịch sử chat String để truyền vào state
     history_str = _history_to_string(chat_history)
 
+    # Tạo instance của CRAG app
     app = create_crag_app()
     result = app.invoke({
         "question": user_input,
