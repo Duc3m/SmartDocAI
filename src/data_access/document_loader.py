@@ -6,7 +6,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from src.utils.timer import time_it
 
 @time_it
-def load_and_split_document(file_path):
+def load_and_split_document(file_path, chunk_size=600, chunk_overlap=100):
     """
     Đọc nội dung PDF và chia nhỏ thành các chunks [cite: 142-143, 163-164].
     """
@@ -23,9 +23,12 @@ def load_and_split_document(file_path):
     documents = loader.load()
     
     # 2. Cấu hình bộ cắt văn bản [cite: 173-178]
+    safe_chunk_size = max(100, int(chunk_size))
+    safe_chunk_overlap = max(0, min(int(chunk_overlap), safe_chunk_size - 1))
+
     text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=600,    # Mỗi đoạn tối đa 600 ký tự [cite: 182]
-        chunk_overlap=100,  # 100 ký tự trùng lặp giữa các đoạn liên tiếp [cite: 183-184]
+        chunk_size=safe_chunk_size,
+        chunk_overlap=safe_chunk_overlap,
         add_start_index=True # Lưu vị trí bắt đầu của đoạn để truy vết sau này
     )
     

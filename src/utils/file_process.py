@@ -8,10 +8,13 @@ from src.data_access.vector_store import create_vector_db, load_vector_db, save_
 from src.data_access.database import get_chat_history, insert_file_metadata
 
 @time_it
-def process_new_uploaded_file(uploaded_file, embedding_model):
+def process_new_uploaded_file(uploaded_file, embedding_model, chunk_size=600, chunk_overlap=100):
     """Chỉ chịu trách nhiệm xử lý logic khi có file mới tải lên"""
     data_dir = "data"
     os.makedirs(data_dir, exist_ok=True)
+
+    chunk_size = max(100, int(chunk_size))
+    chunk_overlap = max(0, min(int(chunk_overlap), chunk_size - 1))
     
     # BƯỚC A: Lưu file tạm và băm nhỏ
     original_ext = os.path.splitext(uploaded_file.name)[1].lower()    
@@ -19,7 +22,11 @@ def process_new_uploaded_file(uploaded_file, embedding_model):
     with open(temp_path, "wb") as f:
         f.write(uploaded_file.getbuffer())
     
-    chunks = load_and_split_document(temp_path)
+    chunks = load_and_split_document(
+        temp_path,
+        chunk_size=chunk_size,
+        chunk_overlap=chunk_overlap,
+    )
     
     # BƯỚC B & C: Lưu Metadata và Đổi tên file
     file_id = insert_file_metadata(uploaded_file.name, len(chunks))
@@ -38,11 +45,14 @@ def process_new_uploaded_file(uploaded_file, embedding_model):
     st.session_state.current_file = uploaded_file.name
     st.session_state.current_file_id = file_id
 
-def switch_to_existing_file(target_id, target_file, embedding_model):
+def switch_to_existing_file(target_id, target_file, embedding_model, chunk_size=600, chunk_overlap=100):
     """Xử lý việc load lại file cũ từ DB"""
     final_filename = f"{target_id}_{target_file}"
     file_path = os.path.join("data", final_filename)
     db_path = os.path.join("vector_db", f"{final_filename}_index")
+
+    chunk_size = max(100, int(chunk_size))
+    chunk_overlap = max(0, min(int(chunk_overlap), chunk_size - 1))
     
     if not os.path.exists(file_path):
         return False # Trả về False nếu lỗi
@@ -50,7 +60,11 @@ def switch_to_existing_file(target_id, target_file, embedding_model):
     if os.path.exists(db_path):
         vector_db = load_vector_db(db_path, embedding_model)
     else:
-        chunks = load_and_split_document(file_path)
+        chunks = load_and_split_document(
+            file_path,
+            chunk_size=chunk_size,
+            chunk_overlap=chunk_overlap,
+        )
         vector_db = create_vector_db(chunks, embedding_model)
         save_vector_db(vector_db, db_path)
     
