@@ -26,6 +26,7 @@ def process_new_uploaded_file(uploaded_file, embedding_model, chunk_size=600, ch
         temp_path,
         chunk_size=chunk_size,
         chunk_overlap=chunk_overlap,
+        source_name=uploaded_file.name,
     )
     
     # BƯỚC B & C: Lưu Metadata và Đổi tên file
@@ -64,6 +65,7 @@ def switch_to_existing_file(target_id, target_file, embedding_model, chunk_size=
             file_path,
             chunk_size=chunk_size,
             chunk_overlap=chunk_overlap,
+            source_name=target_file,
         )
         vector_db = create_vector_db(chunks, embedding_model)
         save_vector_db(vector_db, db_path)

@@ -1,4 +1,5 @@
 import sqlite3
+import json
 from datetime import datetime
 
 def get_db_connection():
@@ -23,8 +24,16 @@ def init_db():
                   file_id INTEGER,
                   role TEXT,
                   content TEXT,
+                  citations TEXT,
                   timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                   FOREIGN KEY (file_id) REFERENCES files (id))''')
+
+    # Kiểm tra nếu cột "citations" đã tồn tại, nếu chưa thì thêm vào
+    columns = c.execute("PRAGMA table_info(messages)").fetchall()
+    column_names = [column[1] for column in columns]
+    if "citations" not in column_names:
+        c.execute("ALTER TABLE messages ADD COLUMN citations TEXT")
+
     conn.commit()
     conn.close()
 
@@ -41,12 +50,19 @@ def insert_file_metadata(filename, num_chunks):
     conn.close()
     return inserted_id
 
-def insert_message(file_id, role, content):
+def insert_message(file_id, role, content, citations=None):
     """Lưu một tin nhắn vào database"""
     conn = sqlite3.connect('smartdoc.db')
     c = conn.cursor()
-    c.execute("INSERT INTO messages (file_id, role, content) VALUES (?, ?, ?)", 
-              (file_id, role, content))
+    # Chuẩn bị dữ liệu citations để lưu vào DB (nếu có)
+    serialized_citations = None
+    if citations:
+        serialized_citations = json.dumps(citations, ensure_ascii=False)
+
+    c.execute(
+        "INSERT INTO messages (file_id, role, content, citations) VALUES (?, ?, ?, ?)",
+        (file_id, role, content, serialized_citations),
+    )
     conn.commit()
     conn.close()
 
@@ -55,10 +71,27 @@ def get_chat_history(file_id):
     conn = sqlite3.connect('smartdoc.db')
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
-    c.execute("SELECT role, content FROM messages WHERE file_id = ? ORDER BY timestamp ASC", (file_id,))
+    c.execute(
+        "SELECT role, content, citations FROM messages WHERE file_id = ? ORDER BY timestamp ASC",
+        (file_id,),
+    )
     rows = c.fetchall()
     conn.close()
-    return [{"role": row["role"], "content": row["content"]} for row in rows]
+    # Chuyển đổi dữ liệu từ DB thành định dạng dễ sử dụng trong ứng dụng
+    history = []
+    for row in rows:
+        message = {"role": row["role"], "content": row["content"]}
+        raw_citations = row["citations"]
+        if raw_citations:
+            try:
+                parsed_citations = json.loads(raw_citations)
+                if isinstance(parsed_citations, list):
+                    message["citations"] = parsed_citations
+            except json.JSONDecodeError:
+                pass
+        history.append(message)
+
+    return history
 
 def delete_chat_history(file_id):
     """Xóa sạch tin nhắn của một file"""

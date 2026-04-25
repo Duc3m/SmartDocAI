@@ -48,11 +48,18 @@ def _build_context_bundle(documents: List[Any]) -> tuple[str, Dict[str, Dict[str
         metadata = doc.metadata or {}
         source_id = f"S{index}"
         source_path = metadata.get("source") or metadata.get("file_name") or "Unknown"
+        if isinstance(source_path, str) and source_path.startswith("temp_") and st.session_state.get("current_file"):
+            source_path = st.session_state.get("current_file")
         file_name = os.path.basename(source_path)
+        doc_type = str(metadata.get("doc_type") or os.path.splitext(file_name)[1].lower())
 
         page_value = metadata.get("page")
-        if isinstance(page_value, int):
+        if isinstance(page_value, int) and doc_type == ".pdf":
             page_number = page_value + 1
+        elif isinstance(page_value, int):
+            page_number = page_value
+        elif isinstance(page_value, str) and page_value.strip().isdigit():
+            page_number = int(page_value.strip())
         else:
             page_number = None
 
@@ -66,6 +73,7 @@ def _build_context_bundle(documents: List[Any]) -> tuple[str, Dict[str, Dict[str
         source_map[source_id] = {
             "source_id": source_id,
             "file_name": file_name,
+            "doc_type": doc_type,
             "page": page_number,
             "position": {
                 "start": char_start,
@@ -160,6 +168,7 @@ def _normalize_citation_payload(
             {
                 "source_id": source_id,
                 "file_name": source_payload["file_name"],
+                "doc_type": source_payload.get("doc_type"),
                 "page": source_payload["page"],
                 "position": source_payload["position"],
                 "chunk_id": source_payload["chunk_id"],

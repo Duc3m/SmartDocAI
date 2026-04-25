@@ -6,7 +6,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from src.utils.timer import time_it
 
 @time_it
-def load_and_split_document(file_path, chunk_size=600, chunk_overlap=100):
+def load_and_split_document(file_path, chunk_size=1000, chunk_overlap=200, source_name=None):
     """
     Đọc nội dung file và chia nhỏ thành các chunks.
     """
@@ -35,12 +35,13 @@ def load_and_split_document(file_path, chunk_size=600, chunk_overlap=100):
     # Chia nhỏ tài liệu thành các chunks
     chunks = text_splitter.split_documents(documents)
 
-    # Gắn metadata cho mỗi chunk để dễ dàng truy vết nguồn gốc sau này
-    file_name = os.path.basename(file_path)
+    file_name = source_name or os.path.basename(file_path)
     for index, chunk in enumerate(chunks, start=1):
         chunk.metadata = chunk.metadata or {}
         chunk.metadata["chunk_id"] = index
         chunk.metadata["file_name"] = file_name
+        chunk.metadata["source"] = file_name
+        chunk.metadata["doc_type"] = ext
         start_index = chunk.metadata.get("start_index")
         if isinstance(start_index, int):
             chunk.metadata["char_start"] = start_index

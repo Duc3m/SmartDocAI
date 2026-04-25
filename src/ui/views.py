@@ -12,6 +12,19 @@ from data_access.database import get_chat_history, insert_file_metadata, insert_
 from utils.file_process import process_new_uploaded_file, switch_to_existing_file
 
 
+def _normalize_display_text(text: str) -> str:
+    if not isinstance(text, str):
+        return ""
+
+    normalized = text.replace("\r\n", "\n").replace("\r", "\n")
+    normalized = re.sub(r"[\t\f\v]+", " ", normalized)
+    normalized = re.sub(r"\n[ \t]+", "\n", normalized)
+    normalized = re.sub(r"[ \t]+\n", "\n", normalized)
+    normalized = re.sub(r"\n{3,}", "\n\n", normalized)
+    normalized = re.sub(r" {2,}", " ", normalized)
+    return normalized.strip()
+
+
 def _find_exact_or_whitespace_span(context: str, quote: str):
     exact_match = re.search(re.escape(quote), context, flags=re.IGNORECASE)
     if exact_match:
@@ -89,8 +102,8 @@ def _find_best_span(context: str, quote: str):
 
 
 def _highlight_context(context: str, quote: str) -> str:
-    safe_context = context or ""
-    safe_quote = (quote or "").strip()
+    safe_context = _normalize_display_text(context or "")
+    safe_quote = _normalize_display_text((quote or "").strip())
 
     if not safe_context:
         return ""
@@ -119,22 +132,44 @@ def _render_citations(citations):
     for index, citation in enumerate(citations, start=1):
         source_id = citation.get("source_id", f"S{index}")
         file_name = citation.get("file_name", "Unknown")
+        if isinstance(file_name, str) and file_name.startswith("temp_") and st.session_state.get("current_file"):
+            file_name = st.session_state.get("current_file")
+
+        doc_type = str(citation.get("doc_type") or "").lower()
+        if not doc_type and isinstance(file_name, str) and "." in file_name:
+            doc_type = f".{file_name.rsplit('.', 1)[-1].lower()}"
+
         page = citation.get("page")
         position = citation.get("position", {}) or {}
         chunk_id = citation.get("chunk_id", "N/A")
-        quote = citation.get("quote", "")
-        context = citation.get("context", "")
+        quote = _normalize_display_text(citation.get("quote", ""))
+        context = _normalize_display_text(citation.get("context", ""))
 
         start_pos = position.get("start")
         end_pos = position.get("end")
-        page_text = f"trang {page}" if isinstance(page, int) else "trang N/A"
+
+        page_text = None
+        if isinstance(page, int):
+            page_text = f"trang {page}"
+        elif doc_type == ".pdf":
+            page_text = "trang N/A"
+
         if isinstance(start_pos, int) and isinstance(end_pos, int):
             pos_text = f"vị trí {start_pos}-{end_pos}"
         else:
             pos_text = "vị trí N/A"
 
-        with st.expander(f"[{source_id}] {file_name} • {page_text} • chunk {chunk_id}"):
-            st.caption(f"{page_text} • {pos_text}")
+        header_parts = [f"[{source_id}] {file_name}"]
+        if page_text:
+            header_parts.append(page_text)
+        header_parts.append(f"chunk {chunk_id}")
+
+        with st.expander(" • ".join(header_parts)):
+            caption_parts = []
+            if page_text:
+                caption_parts.append(page_text)
+            caption_parts.append(pos_text)
+            st.caption(" • ".join(caption_parts))
             if quote:
                 st.markdown(f"**Đoạn được dùng:** _{quote}_")
 
@@ -150,9 +185,9 @@ def main_chat_view(embedding_model, llm):
     if "processing_mode" not in st.session_state:
         st.session_state.processing_mode = "RAG Thường"
     if "chunk_size" not in st.session_state:
-        st.session_state.chunk_size = 600
+        st.session_state.chunk_size = 1000
     if "chunk_overlap" not in st.session_state:
-        st.session_state.chunk_overlap = 100
+        st.session_state.chunk_overlap = 200
 
     rag_mode = st.session_state.processing_mode
     mode_icon = ":material/auto_awesome:" if "CRAG" in rag_mode else ":material/bolt:"
@@ -307,7 +342,7 @@ def main_chat_view(embedding_model, llm):
             _render_citations(citations)
                 
         # Lưu vào DB và Session State
-        insert_message(file_id, "assistant", answer_text)
+        insert_message(file_id, "assistant", answer_text, citations=citations)
         st.session_state.messages.append({"role": "assistant", "content": answer_text, "citations": citations})
         st.rerun()
 
