@@ -199,7 +199,7 @@ def main_chat_view(embedding_model, llm):
         with control_col_mode:
             with st.popover(f"{mode_icon} **{rag_mode}**", key="mode_selector"):
             
-                # Nút lựa chọn 1: RAG Thường
+                # Nút chọn RAG Thường
                 if st.button("**RAG Thường**", 
                             icon=":material/bolt:", 
                             key="btn_mode_rag", 
@@ -207,7 +207,7 @@ def main_chat_view(embedding_model, llm):
                     st.session_state.processing_mode = "RAG Thường"
                     st.rerun() # Load lại trang ngay lập tức để nhận mode mới
                     
-                # Nút lựa chọn 2: CRAG
+                # Nút chọn CRAG
                 if st.button("**Recursive CRAG**", 
                             icon=":material/auto_awesome:", 
                             key="btn_mode_crag", 
@@ -256,7 +256,7 @@ def main_chat_view(embedding_model, llm):
                 st.session_state.processing_mode = "Recursive CRAG"
                 st.rerun()
     
-    # 1. GIAO DIỆN UPLOAD
+    # GIAO DIỆN UPLOAD
     if not st.session_state.get("file_processed"):
         st.markdown("### :material/upload_file: Tải lên tài liệu PDF/DOCX để bắt đầu")
         uploaded_file = st.file_uploader(
@@ -276,7 +276,7 @@ def main_chat_view(embedding_model, llm):
                 status.update(label="Tài liệu đã sẵn sàng!", state="complete", expanded=False)
             st.rerun()
 
-    # 2. GIAO DIỆN CHUYỂN ĐỔI FILE
+    # GIAO DIỆN CHUYỂN ĐỔI FILE
     target_id = st.session_state.get("selected_file_id_to_load")
     if target_id and target_id != st.session_state.get("current_file_id"):
         target_file = st.session_state.selected_file_to_load
@@ -295,18 +295,12 @@ def main_chat_view(embedding_model, llm):
                 st.error(f"Không tìm thấy file '{target_file}' trong hệ thống!")
                 st.session_state.selected_file_id_to_load = None
 
-    # 3. THÔNG TIN FILE ĐANG CHAT
+    # THÔNG TIN FILE ĐANG CHAT
     if st.session_state.get("file_processed") and st.session_state.get("current_file"):
         st.info(f":material/smart_toy: Đang làm việc với file: **{st.session_state.current_file}**")
     st.divider()
-#     rag_mode = st.radio(
-#     "Chế độ xử lý:",
-#     ["RAG Thường", "Recursive CRAG (LangGraph)"],
-#     horizontal=True,
-#     help="CRAG sẽ tự động kiểm tra tài liệu và tìm kiếm lại nếu dữ liệu không liên quan."
-# )
 
-    # 4. MÀN HÌNH HIỂN THỊ CHAT
+    # MÀN HÌNH HIỂN THỊ CHAT
     if "messages" not in st.session_state:
         st.session_state.messages = []
 
@@ -316,7 +310,7 @@ def main_chat_view(embedding_model, llm):
             if message["role"] == "assistant":
                 _render_citations(message.get("citations", []))
 
-    # 5. Ô NHẬP LIỆU
+    # Ô NHẬP LIỆU
     if prompt := st.chat_input("Hỏi bất cứ điều gì về tài liệu..."):
         if not st.session_state.get("file_processed"):
             st.error("Vui lòng tải lên tài liệu trước khi đặt câu hỏi!")

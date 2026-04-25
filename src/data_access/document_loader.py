@@ -8,9 +8,9 @@ from src.utils.timer import time_it
 @time_it
 def load_and_split_document(file_path, chunk_size=1000, chunk_overlap=200, source_name=None):
     """
-    Đọc nội dung PDF và chia nhỏ thành các chunks.
+    Đọc nội dung file và chia nhỏ thành các chunks.
     """
-    # 1. Xác định đuôi file để chọn đúng Loader
+    # Xác định đuôi file để chọn đúng Loader
     ext = os.path.splitext(file_path)[1].lower()
     
     if ext == '.pdf':
@@ -22,7 +22,7 @@ def load_and_split_document(file_path, chunk_size=1000, chunk_overlap=200, sourc
 
     documents = loader.load()
     
-    # 2. Cấu hình bộ cắt văn bản [cite: 173-178]
+    # Khởi tạo Text Splitter
     safe_chunk_size = max(100, int(chunk_size))
     safe_chunk_overlap = max(0, min(int(chunk_overlap), safe_chunk_size - 1))
 
@@ -32,7 +32,7 @@ def load_and_split_document(file_path, chunk_size=1000, chunk_overlap=200, sourc
         add_start_index=True # Lưu vị trí bắt đầu của đoạn để truy vết sau này
     )
     
-    # 3. Thực hiện chia nhỏ [cite: 179-180]
+    # Chia nhỏ tài liệu thành các chunks
     chunks = text_splitter.split_documents(documents)
 
     file_name = source_name or os.path.basename(file_path)

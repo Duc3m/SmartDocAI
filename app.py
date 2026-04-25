@@ -15,19 +15,9 @@ from data_access.database import init_db
 
 st.set_page_config(
     page_title="SmartDoc AI",
-    page_icon="🤖",
+    page_icon=":material/robot:",
     layout="wide"
 )
-
-# Ẩn dải màu trang trí trên cùng của Streamlit
-st.markdown("""
-    <style>
-        [data-testid="stDecoration"] {
-            display: none;
-        }
-        
-    </style>
-""", unsafe_allow_html=True)
 
 def main():
     # Khởi tạo Database SQLite
@@ -36,16 +26,13 @@ def main():
     # Tải mô hình
     embedding_model = get_embedding_model()
     llm = get_llm()
-    
-    inject_custom_css()
-    # Cấu trúc giao diện mới: Trái (Sidebar) và Phải (Main)
-    render_sidebar()
-    
     if llm is None:
         st.error("Không thể kết nối với Ollama. Vui lòng kiểm tra ứng dụng Ollama đã chạy chưa!")
         return
     
-    # Khu vực chính
+    # Render giao diện và custom CSS
+    inject_custom_css()
+    render_sidebar()
     main_chat_view(embedding_model, llm)
 
 if __name__ == "__main__":

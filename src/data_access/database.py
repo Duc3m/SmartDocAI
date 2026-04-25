@@ -18,7 +18,7 @@ def init_db():
                   num_chunks INTEGER,
                   upload_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
     
-    # Bảng lưu tin nhắn chat (Logic mới)
+    # Bảng lưu tin nhắn chat
     c.execute('''CREATE TABLE IF NOT EXISTS messages
                  (id INTEGER PRIMARY KEY AUTOINCREMENT,
                   file_id INTEGER,
@@ -102,7 +102,7 @@ def delete_chat_history(file_id):
     conn.close()
 
 def get_all_files():
-    """Lấy danh sách tất cả file đã tải lên[cite: 627]."""
+    """Lấy danh sách tất cả file đã tải lên"""
     conn = get_db_connection()
     files = conn.execute('SELECT * FROM files ORDER BY upload_date DESC').fetchall()
     conn.close()
