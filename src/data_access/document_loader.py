@@ -6,9 +6,9 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from src.utils.timer import time_it
 
 @time_it
-def load_and_split_document(file_path, chunk_size=600, chunk_overlap=100):
+def load_and_split_document(file_path, chunk_size=1000, chunk_overlap=200, source_name=None):
     """
-    Đọc nội dung PDF và chia nhỏ thành các chunks [cite: 142-143, 163-164].
+    Đọc nội dung PDF và chia nhỏ thành các chunks.
     """
     # 1. Xác định đuôi file để chọn đúng Loader
     ext = os.path.splitext(file_path)[1].lower()
@@ -35,11 +35,13 @@ def load_and_split_document(file_path, chunk_size=600, chunk_overlap=100):
     # 3. Thực hiện chia nhỏ [cite: 179-180]
     chunks = text_splitter.split_documents(documents)
 
-    file_name = os.path.basename(file_path)
+    file_name = source_name or os.path.basename(file_path)
     for index, chunk in enumerate(chunks, start=1):
         chunk.metadata = chunk.metadata or {}
         chunk.metadata["chunk_id"] = index
         chunk.metadata["file_name"] = file_name
+        chunk.metadata["source"] = file_name
+        chunk.metadata["doc_type"] = ext
         start_index = chunk.metadata.get("start_index")
         if isinstance(start_index, int):
             chunk.metadata["char_start"] = start_index
