@@ -5,22 +5,22 @@ from data_access.database import delete_chat_history, get_all_files, delete_file
 
 def perform_delete(file_id, filename, is_current):
     """Thực thi việc xóa vật lý và dọn dẹp bộ nhớ cho 1 file cụ thể."""
-    # 1. Xóa trong Database
+    # Xóa trong Database
     delete_file_record(file_id)
     delete_chat_history(file_id)
     
-    # 2. Xóa File PDF và Thư mục FAISS
+    # Xóa File và Thư mục FAISS
     final_filename = f"{file_id}_{filename}"
     
-    pdf_path = os.path.join("data", final_filename)
-    if os.path.exists(pdf_path):
-        os.remove(pdf_path)
+    file_path = os.path.join("data", final_filename)
+    if os.path.exists(file_path):
+        os.remove(file_path)
         
     db_path = os.path.join("vector_db", f"{final_filename}_index")
     if os.path.exists(db_path):
         shutil.rmtree(db_path)
     
-    # 3. Dọn dẹp Session nếu đang mở đúng file bị xóa
+    # Dọn dẹp Session nếu đang mở đúng file bị xóa
     if is_current:
         st.session_state.pop("current_file", None)
         st.session_state.pop("current_file_id", None)
@@ -29,9 +29,15 @@ def perform_delete(file_id, filename, is_current):
         st.session_state.messages = []
 
 @st.dialog("⚠️ Xác nhận xóa")
-def confirm_delete_dialog(mode="single", file_id=None, filename=None, is_current=False, all_files=None):
+def confirm_delete_dialog(
+    mode="single", 
+    file_id=None, 
+    filename=None, 
+    is_current=False, 
+    all_files=None
+):
     """
-    Hộp thoại dùng chung cho cả 2 trường hợp: Xóa 1 file và Xóa tất cả.
+    Dialog xác nhận xóa file
     """
     # Hiển thị câu cảnh báo tùy theo chế độ
     if mode == "single":
@@ -66,7 +72,7 @@ def render_sidebar():
         st.markdown("# :material/rocket_launch: SmartDoc AI")
         st.subheader("Intelligent Document Q&A")
         
-        # --- 1. NÚT TẠO CUỘC TRÒ CHUYỆN MỚI ---
+        # Nút tạo cuộc trò chuyện mới
         is_new_chat = not st.session_state.get("current_file_id")
         new_chat_btn_type = "primary" if is_new_chat else "secondary"
 
@@ -90,7 +96,7 @@ def render_sidebar():
         # Lấy danh sách file trước để UI xử lý logic hiển thị
         files = get_all_files()
 
-        # --- 2. TIÊU ĐỀ VÀ NÚT XÓA TẤT CẢ (Nằm ngang) ---
+        # Tiêu đề và nút xóa tất cả
         col_title, col_btn = st.columns([4, 1], vertical_alignment="center")
         with col_title:
             st.markdown("### :material/folder_open: Lịch sử tài liệu")
@@ -103,11 +109,11 @@ def render_sidebar():
                              key="btn_del_all"):
                     confirm_delete_dialog(mode="all", all_files=files)
 
-        # --- 3. HIỂN THỊ DANH SÁCH TỪNG FILE ---
+        # Hiển thị danh sách file
         if not files:
             st.info("Chưa có tài liệu nào trong hệ thống.")
         else:
-            # ---> BẮT ĐẦU PHẦN THÊM MỚI: Radio lọc tài liệu <---
+            # Lọc tài liệu theo định dạng
             filter_type = st.radio(
                 "Lọc tài liệu:",
                 ["Tất cả", "PDF", "DOCX"],
@@ -122,13 +128,11 @@ def render_sidebar():
                 filtered_files = [f for f in files if f['filename'].lower().endswith(('.docx', '.doc'))]
             else:
                 filtered_files = files
-            # ---> KẾT THÚC PHẦN THÊM MỚI <---
 
             # Kiểm tra xem sau khi lọc có còn file nào không
             if not filtered_files:
                 st.info(f"Không có tài liệu {filter_type} nào.")
             else:
-                # ---> LƯU Ý: Vòng lặp đổi từ `files` thành `filtered_files` <---
                 for file in filtered_files:
                     col1, col2 = st.columns([4, 1])
                     
@@ -141,8 +145,7 @@ def render_sidebar():
 
                         if len(display_name) > 20:
                             display_name = display_name[:17] + "..."
-                            
-                        # BỘ NHẬN DIỆN ICON CHUẨN GOOGLE MATERIAL
+                        
                         if ext == "pdf":
                             file_icon = ":material/picture_as_pdf:" 
                         elif ext in ["docx", "doc"]:

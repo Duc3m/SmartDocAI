@@ -2,12 +2,12 @@ from langchain_core.prompts import PromptTemplate
 
 def is_vietnamese(user_input: str) -> bool:
     """
-    Kiểm tra xem câu hỏi có chứa ký tự tiếng Việt có dấu hay không.
+    Kiểm tra xem câu hỏi có phải tiếng Việt không
     """
     vietnamese_chars = 'áàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđ'
     return any(char in user_input.lower() for char in vietnamese_chars)
 
-# --- PROMPT CHẤM ĐIỂM (CRAG EVALUATOR) ---
+# PROMPT ĐÁNH GIÁ MỨC ĐỘ LIÊN QUAN CỦA TÀI LIỆU
 GRADER_PROMPT = PromptTemplate.from_template(
     """Bạn là một chuyên gia đánh giá mức độ liên quan của tài liệu.
     Câu hỏi: {question}
@@ -20,7 +20,7 @@ GRADER_PROMPT = PromptTemplate.from_template(
     Kết quả:"""
 )
 
-# --- PROMPT VIẾT LẠI CÂU HỎI (REWRITE QUERY) ---
+# PROMPT VIẾT LẠI CÂU HỎI
 REWRITE_PROMPT = PromptTemplate.from_template(
     """Bạn là một chuyên gia tối ưu hóa truy vấn cho Vector Database.
     Câu hỏi gốc: {question}
@@ -38,9 +38,8 @@ def get_prompt_template(user_input: str) -> PromptTemplate:
     Trả về PromptTemplate tối ưu dựa trên ngôn ngữ được phát hiện từ câu hỏi.
     """
 
-
     if is_vietnamese(user_input):
-        # Prompt cho tiếng Việt (Giữ nguyên format cũ của bạn)
+        # Prompt cho tiếng Việt
         prompt_text = r"""
             Bạn là một chuyên gia phân tích tài liệu chuyên nghiệp.
             Nhiệm vụ của bạn là trả lời câu hỏi của người dùng DỰA VÀO DUY NHẤT ngữ cảnh (Context) được cung cấp dưới đây.
